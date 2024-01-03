@@ -86,12 +86,13 @@ class State:
 class Observation(NamedTuple):
     """
     The observation returned by the LBF environment.
-
-    agents_view: (num_agents, grid_size, grid_size) int32 array representing the view of each agent.
-    action_mask: boolean array representing whether each of the 5 actions is legal, for each agent.
+    agents_view: (num_agents, grid_size, grid_size) int32 array
+        representing the view of each agent.
+    action_mask: boolean array representing which action (noop, up, right, down, left, load)
+        is legal, for each agent.
     step_count: (int32) the current episode step.
     """
 
-    agents_view: chex.Array  # (num_agents, grid_size, grid_size)
+    agents_view: chex.Array  # (num_agents, fov, fov)
     action_mask: chex.Array  # (num_agents, 6)
     step_count: chex.Array  # ()

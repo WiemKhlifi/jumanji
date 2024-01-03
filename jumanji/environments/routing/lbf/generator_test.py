@@ -27,11 +27,20 @@ def test_generator() -> None:
     key = jax.random.PRNGKey(42)
 
     grid_size = 6
+    fov = 6
     num_agents = 7
     num_food = 6
     max_agent_level = 10
+    force_coop = False
 
-    gen = RandomGenerator(grid_size, num_agents, num_food, max_agent_level)
+    gen = RandomGenerator(
+        grid_size=grid_size,
+        fov=fov,
+        num_agents=num_agents,
+        num_food=num_food,
+        max_agent_level=max_agent_level,
+        force_coop=force_coop,
+    )
     state = gen(key)
 
     # Test foods and agents placed within grid bounds.

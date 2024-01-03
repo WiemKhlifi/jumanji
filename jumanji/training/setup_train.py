@@ -33,6 +33,7 @@ from jumanji.environments import (
     GraphColoring,
     JobShop,
     Knapsack,
+    LevelBasedForaging,
     Maze,
     Minesweeper,
     MultiCVRP,
@@ -192,6 +193,9 @@ def _setup_random_policy(  # noqa: CCR001
     elif cfg.env.name == "graph_coloring":
         assert isinstance(env.unwrapped, GraphColoring)
         random_policy = networks.make_random_policy_graph_coloring()
+    elif cfg.env.name == "lbf":
+        assert isinstance(env.unwrapped, LevelBasedForaging)
+        random_policy = networks.make_random_policy_lbf()
     else:
         raise ValueError(f"Environment name not found. Got {cfg.env.name}.")
     return random_policy
@@ -362,6 +366,15 @@ def _setup_actor_critic_neworks(  # noqa: CCR001
         actor_critic_networks = networks.make_actor_critic_networks_graph_coloring(
             graph_coloring=env.unwrapped,
             num_transformer_layers=cfg.env.network.num_transformer_layers,
+            transformer_num_heads=cfg.env.network.transformer_num_heads,
+            transformer_key_size=cfg.env.network.transformer_key_size,
+            transformer_mlp_units=cfg.env.network.transformer_mlp_units,
+        )
+    elif cfg.env.name == "lbf":
+        assert isinstance(env.unwrapped, LevelBasedForaging)
+        actor_critic_networks = networks.make_actor_critic_networks_lbf(
+            lbf_env=env.unwrapped,
+            transformer_num_blocks=cfg.env.network.transformer_num_blocks,
             transformer_num_heads=cfg.env.network.transformer_num_heads,
             transformer_key_size=cfg.env.network.transformer_key_size,
             transformer_mlp_units=cfg.env.network.transformer_mlp_units,

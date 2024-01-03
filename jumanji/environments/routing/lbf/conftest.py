@@ -19,7 +19,8 @@ import pytest
 
 from jumanji.environments.routing.lbf.env import LevelBasedForaging
 from jumanji.environments.routing.lbf.generator import RandomGenerator
-from jumanji.environments.routing.lbf.observer import GridObserver
+
+# from jumanji.environments.routing.lbf.observer import GridObserver
 from jumanji.environments.routing.lbf.types import Agent, Food, State
 from jumanji.tree_utils import tree_transpose
 
@@ -134,8 +135,13 @@ def food_grid() -> chex.Array:
 @pytest.fixture
 def level_based_foraging_env() -> LevelBasedForaging:
     generator = RandomGenerator(
-        grid_size=3, num_agents=4, num_food=2, max_agent_level=2
+        grid_size=8,
+        fov=8,
+        num_agents=4,
+        num_food=2,
+        max_agent_level=2,
+        force_coop=False,
     )
-    observer = GridObserver(fov=1, grid_size=3)
+    # observer = GridObserver(fov=1, grid_size=3)
 
-    return LevelBasedForaging(generator=generator, observer=observer, time_limit=5)
+    return LevelBasedForaging(generator=generator, grid_observation=True, time_limit=5)

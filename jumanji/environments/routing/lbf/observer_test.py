@@ -41,7 +41,7 @@ from jumanji.environments.routing.lbf.types import Food, State
 
 
 def test_grid_observer(state: State) -> None:
-    observer = GridObserver(fov=1, grid_size=3)
+    observer = GridObserver(fov=1, grid_size=3, num_agents=2, num_food=2)
     obs = observer.state_to_observation(state)
     expected_agent_0_view = jnp.array(
         [
@@ -121,7 +121,7 @@ def test_grid_observer(state: State) -> None:
     )
 
     # test different fov
-    observer = GridObserver(fov=3, grid_size=3)
+    observer = GridObserver(fov=3, grid_size=3, num_agents=2, num_food=2)
     # test eaten food is not visible
     eaten = jnp.array([True, False])
     foods = Food(
@@ -171,7 +171,7 @@ def test_grid_observer(state: State) -> None:
 
 
 def test_vector_observer(state: State) -> None:
-    observer = VectorObserver(fov=1, grid_size=3)
+    observer = VectorObserver(fov=1, grid_size=3, num_agents=2, num_food=2)
     obs = observer.state_to_observation(state)
     expected_agent_0_view = jnp.array(
         [1, 1, 4, -1, -1, 0, 0, 0, 1, 0, 1, 2, 1, 0, 2, -1, -1, 0]
@@ -190,7 +190,7 @@ def test_vector_observer(state: State) -> None:
     )
 
     # test different fov
-    observer = VectorObserver(fov=3, grid_size=3)
+    observer = VectorObserver(fov=3, grid_size=3, num_agents=2, num_food=2)
     # test eaten food is not visible
     eaten = jnp.array([True, False])
     foods = Food(
@@ -209,3 +209,6 @@ def test_vector_observer(state: State) -> None:
     assert jnp.all(
         obs.action_mask[3, ...] == jnp.array([True, True, False, True, True, True])
     )
+
+
+# TODO: add test for the "2s" case.

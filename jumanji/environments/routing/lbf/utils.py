@@ -159,3 +159,11 @@ def slice_around(pos: chex.Array, fov: int) -> Tuple[chex.Array, chex.Array]:
     start_x = shifted_pos[0] - fov
     start_y = shifted_pos[1] - fov
     return start_x, start_y
+
+
+def calculate_num_observation_features(num_food: int, num_agents: int) -> chex.Array:
+    """Calculate the number of features in an agent view"""
+    num_obs_food = 3 * num_food
+    num_obs_agent = 3 * num_agents
+    obs_features = num_obs_food + num_obs_agent
+    return jnp.array(obs_features, jnp.int32)

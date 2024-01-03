@@ -19,13 +19,15 @@ from typing import Callable, Optional, Sequence, Tuple
 
 import chex
 import matplotlib.animation as animation
+import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.collections import LineCollection
+from matplotlib.offsetbox import AnnotationBbox, OffsetImage
 from numpy.typing import NDArray
 
 import jumanji
-import jumanji.environments.routing.robot_warehouse.constants as constants
+import jumanji.environments.routing.lbf.constants as constants
 from jumanji.environments.routing.lbf.types import Agent, Entity, Food, State
 from jumanji.tree_utils import tree_slice
 from jumanji.viewer import Viewer
@@ -35,24 +37,25 @@ class LevelBasedForagingViewer(Viewer):
     def __init__(
         self,
         grid_size: Tuple[int, int],
-        name: str = "RobotWarehouse",
+        name: str = "LevelBasedForaging",
         render_mode: str = "human",
     ) -> None:
-        """Viewer for the RobotWarehouse environment.
+        """Viewer for the LevelBasedForaging environment.
 
         Args:
-            grid_size: the size of the warehouse floor grid (width, height)
-            name: custom name for the Viewer. Defaults to `RobotWarehouse`.
+            grid_size: the size of the grid (width, height)
+            name: custom name for the Viewer. Defaults to `LevelBasedForaging`.
         """
         self._name = name
-        self.rows, self.cols = grid_size
+        self.rows = self.cols = grid_size
+        self.grid_size = 50
 
-        self.cell_size = 30
-        self.icon_size = int(self.cell_size / 3)
+        self.cell_size = self.grid_size
+        self.icon_size = self.cell_size / 3
         self.adjust_center = self.cell_size / 2
 
-        self.width = 1 + self.cols * (self.cell_size + 1)
-        self.height = 1 + self.rows * (self.cell_size + 1)
+        self.width = 1 + self.cols * (self.grid_size + 1)
+        self.height = 1 + self.rows * (self.grid_size + 1)
 
         self._display: Callable[[plt.Figure], Optional[NDArray]]
         if render_mode == "rgb_array":
@@ -67,7 +70,7 @@ class LevelBasedForagingViewer(Viewer):
         self._animation: Optional[animation.Animation] = None
 
     def render(self, state: State) -> Optional[NDArray]:
-        """Render the given state of the `RobotWarehouse` environment.
+        """Render the given state of the `LevelBasedForaging` environment.
 
         Args:
             state: the environment state to render.
@@ -157,16 +160,8 @@ class LevelBasedForagingViewer(Viewer):
 
     def _draw_state(self, ax: plt.Axes, state: State) -> None:
         self._draw_grid(ax)
-        self._draw_agents(state.agents, ax)
         self._draw_foods(state.foods, ax)
-
-    def _entity_position(self, entity: Entity) -> Tuple[float, float]:
-        """Return the position of an entity on the grid."""
-        row, col = entity.position
-        return (
-            row * self.cell_size + 1 + row + self.adjust_center,
-            col * self.cell_size + 1 + col + self.adjust_center,
-        )
+        self._draw_agents(state.agents, ax)
 
     def _draw_grid(self, ax: plt.Axes) -> None:
         """Draw grid of warehouse floor."""
@@ -175,8 +170,8 @@ class LevelBasedForagingViewer(Viewer):
         for r in range(self.rows + 1):
             lines.append(
                 [
-                    (0, (self.cell_size + 1) * r + 1),
-                    ((self.cell_size + 1) * self.cols, (self.cell_size + 1) * r + 1),
+                    (0, (self.grid_size + 1) * r + 1),
+                    ((self.grid_size + 1) * self.cols, (self.grid_size + 1) * r + 1),
                 ]
             )
 
@@ -184,45 +179,13 @@ class LevelBasedForagingViewer(Viewer):
         for c in range(self.cols + 1):
             lines.append(
                 [
-                    ((self.cell_size + 1) * c + 1, 0),
-                    ((self.cell_size + 1) * c + 1, (self.cell_size + 1) * self.rows),
+                    ((self.grid_size + 1) * c + 1, 0),
+                    ((self.grid_size + 1) * c + 1, (self.grid_size + 1) * self.rows),
                 ]
             )
 
         lc = LineCollection(lines, colors=(1, 1, 1))
         ax.add_collection(lc)
-
-    def _draw_foods(self, foods: Food, ax: plt.Axes) -> None:
-        """Draw the foods on the grid."""
-        num_foods = len(foods.level)
-
-        for i in range(num_foods):
-            food = tree_slice(foods, i)
-            if food.eaten:
-                continue
-
-            patch = plt.Circle(
-                self._entity_position(food),
-                radius=self.icon_size / 1.5,
-                facecolor="red",
-            )
-            ax.add_patch(patch)
-
-    def _draw_agents(self, agents: Agent, ax: plt.Axes) -> None:
-        """Draw the agents on the grid."""
-        num_agents = len(agents.level)
-
-        for i in range(num_agents):
-            agent = tree_slice(agents, i)
-            cell_center = self._entity_position(agent)
-            anchor_point = (
-                cell_center[0] - self.icon_size / 2,
-                cell_center[1] - self.icon_size / 2,
-            )
-            patch = plt.Rectangle(
-                anchor_point, self.icon_size, self.icon_size, facecolor="white"
-            )
-            ax.add_patch(patch)
 
     def _display_human(self, fig: plt.Figure) -> None:
         if plt.isinteractive():
@@ -238,3 +201,105 @@ class LevelBasedForagingViewer(Viewer):
     def _display_rgb_array(self, fig: plt.Figure) -> NDArray:
         fig.canvas.draw()
         return np.asarray(fig.canvas.buffer_rgba())
+
+    def _draw_agents(self, agents: Agent, ax: plt.Axes) -> None:
+        """Draw the agents on the grid."""
+        num_agents = len(agents.level)
+
+        for i in range(num_agents):
+            agent = tree_slice(agents, i)
+            cell_center = self._entity_position(agent)
+
+            # Read the image file
+            img = mpimg.imread("icons/agent.png")
+
+            # Resize the image
+            # img_resized = resize(img, (self.icon_size, self.icon_size))
+
+            # Create an OffsetImage and add it to the axis
+            imagebox = OffsetImage(img, zoom=self.icon_size / self.cell_size)
+            ab = AnnotationBbox(
+                imagebox, (cell_center[0], cell_center[1]), frameon=False, zorder=10
+            )
+            ax.add_artist(ab)
+
+            # Add a rectangle (polygon) next to the agent with the agent's level
+            self.draw_badge(agent, ax, cell_center)
+
+    def _draw_foods(self, foods: Food, ax: plt.Axes) -> None:
+        """Draw the foods on the grid."""
+        num_foods = len(foods.level)
+
+        for i in range(num_foods):
+            food = tree_slice(foods, i)
+            if food.eaten:
+                continue
+
+            # Read the image file
+            img = mpimg.imread("icons/apple.png")
+            cell_center = self._entity_position(food)
+
+            # Create an OffsetImage and add it to the axis
+            imagebox = OffsetImage(img, zoom=self.icon_size / self.cell_size)
+            ab = AnnotationBbox(
+                imagebox, (cell_center[0], cell_center[1]), frameon=False, zorder=10
+            )
+            ax.add_artist(ab)
+
+            # Add a rectangle (polygon) next to the agent with the food's level
+            self.draw_badge(food, ax, cell_center)
+
+    def _entity_position(self, entity: Entity) -> Tuple[float, float]:
+        """Return the position of an entity on the grid."""
+        row, col = entity.position
+        return (
+            (row + 1) * self.cell_size + row - self.adjust_center,
+            (col + 1) * self.cell_size + col - self.adjust_center,
+        )
+
+    def draw_badge(
+        self, entity: Entity, ax: plt.Axes, anchor_point: Tuple[float, float]
+    ) -> None:
+        #   resolution = 6
+        #   radius = self.grid_size / 5
+
+        #   badge_x = anchor_point[0] * self.grid_size + (3 / 4) * self.grid_size
+        #   badge_y = self.height - self.grid_size * (anchor_point[1] + 1) + (1 / 4) * self.grid_size
+
+        # make a circle
+        #   verts = []
+        #   for i in range(resolution):
+        #       angle = 2 * np.pi * i / resolution
+        #       x = radius * np.cos(angle) + badge_x
+        #       y = radius * np.sin(angle) + badge_y
+        #       verts += [[x, y]]
+
+        #       circle = plt.Polygon(
+        #               verts,
+        #               edgecolor="white",
+        #               facecolor="white",
+        #           )
+
+        # ax.add_patch(circle)
+        # Calculate the center of the rectangle
+        center_x = anchor_point[0] + self.cell_size / 3
+        center_y = anchor_point[1] - self.cell_size / 3
+
+        rectangle = plt.Rectangle(
+            xy=(center_x, center_y),
+            width=self.cell_size / 3,
+            height=self.cell_size / 3,
+            edgecolor="white",
+            facecolor="black",
+            zorder=10,  # Adjust zorder to ensure the rectangle is drawn below images
+        )
+        ax.add_patch(rectangle)
+
+        ax.annotate(
+            str(entity.level),
+            xy=(center_x + 10, center_y + 10),
+            color="white",
+            ha="center",
+            va="center",
+            zorder=12,
+        )
