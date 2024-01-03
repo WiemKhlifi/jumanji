@@ -206,13 +206,15 @@ class VectorObserver(LbfObserver):
                 & (state.agents.id != agent.id)
             )
         )(next_positions)
+
         # Check if any food is in a next position
         food_occupied = jax.vmap(
             lambda next_pos: jnp.any(
-                jnp.all(next_pos == state.foods.position, axis=-1)
-                & ~state.foods.eaten  # Food must be uneaten to collide
+                jnp.all(next_pos == state.food_items.position, axis=-1)
+                & ~state.food_items.eaten  # Food must be uneaten to collide
             )
         )(next_positions)
+
         # Check if the next position is out of bounds
         out_of_bounds = jnp.any(
             (next_positions < 0) | (next_positions >= self.grid_size), axis=-1
@@ -242,9 +244,9 @@ class VectorObserver(LbfObserver):
 
         # Calculate which foods are within the FOV of the current agent and are not eaten.
         visible_foods = jnp.all(
-            jnp.abs(agent.position - state.foods.position) <= self.fov,
+            jnp.abs(agent.position - state.food_items.position) <= self.fov,
             axis=-1,
-        ) & jnp.invert(state.foods.eaten)
+        ) & jnp.invert(state.food_items.eaten)
 
         # Placeholder observation for foods and agents
         # this is shown if food or agent is not in view.
@@ -253,7 +255,7 @@ class VectorObserver(LbfObserver):
 
         # Extract the positions and levels of visible foods.
         food_xs, food_ys, food_levels = self.extract_foods_info(
-            agent, visible_foods, state.foods
+            agent, visible_foods, state.food_items
         )
 
         # Extract the positions and levels of visible agents.
@@ -360,7 +362,9 @@ class GridObserver(LbfObserver):
         # get grids with only agents and grid with only foods
         grid = jnp.zeros((self.grid_size, self.grid_size), dtype=jnp.int32)
         agent_grids = jax.vmap(utils.place_agent_on_grid, (0, None))(state.agents, grid)
-        food_grids = jax.vmap(utils.place_food_on_grid, (0, None))(state.foods, grid)
+        food_grids = jax.vmap(utils.place_food_on_grid, (0, None))(
+            state.food_items, grid
+        )
         # join all agents into 1 grid and all food into 1 grid
         agent_grid = jnp.sum(agent_grids, axis=0)
         food_grid = jnp.sum(food_grids, axis=0)

@@ -73,8 +73,8 @@ class Generator(abc.ABC):
 class RandomGenerator(Generator):
     """Randomly generates `LBF` grids.
 
-    If too many foods and agents are given for a small grid size, it might not be able to
-    place them on the grid. Because of jax this will fail silently and many foods will
+    If too many food itms and agents are given for a small grid size, it might not be able to
+    place them on the grid. Because of jax this will fail silently and many food items will
     be placed at (0, 0).
     """
 
@@ -94,7 +94,7 @@ class RandomGenerator(Generator):
         )
 
     def sample_food(self, key: chex.PRNGKey) -> chex.Array:
-        """Randomly samples food positions on the grid, ensuring no two foods are adjacent
+        """Randomly samples food positions on the grid, ensuring no two food items are adjacent
         and no food is placed on the edge of the grid.
 
         Args:
@@ -123,7 +123,7 @@ class RandomGenerator(Generator):
         ) -> Tuple[chex.Array, chex.Array]:
             food_flat_pos = jax.random.choice(key=key, a=flat_size, shape=(), p=mask)
 
-            # Mask out adjacent positions to avoid placing foods next to each other
+            # Mask out adjacent positions to avoid placing food items next to each other
             adj_positions = jnp.array(
                 [
                     food_flat_pos,
@@ -202,7 +202,7 @@ class RandomGenerator(Generator):
             key (chex.PRNGKey): The random key for reproducible randomness.
 
         Returns:
-            State: A `LBF` state containing information about the grid, agents, and foods.
+            State: A `LBF` state containing information about the grid, agents, and food items.
         """
 
         (
@@ -244,11 +244,13 @@ class RandomGenerator(Generator):
             position=agent_positions,
             level=agent_levels,
         )
-        foods = jax.vmap(Food)(
+        food_items = jax.vmap(Food)(
             id=jnp.arange(self.num_food),
             position=food_positions,
             level=food_levels,
         )
         step_count = jnp.array(0, jnp.int32)
 
-        return State(key=key, step_count=step_count, agents=agents, foods=foods)
+        return State(
+            key=key, step_count=step_count, agents=agents, food_items=food_items
+        )

@@ -47,32 +47,32 @@ def test_place_agent_on_grid(agent1: Agent, agents: Agent) -> None:
     assert jnp.all(agent_grids == expected_grids)
 
 
-def test_place_food_on_grid(foods: Food) -> None:
+def test_place_food_on_grid(food: Food) -> None:
     grid = jnp.zeros((3, 3))
 
     expected_food_grid = jnp.array([[0, 0, 0], [0, 4, 0], [3, 0, 0]])
-    food_grid = jnp.sum(jax.vmap(place_food_on_grid, (0, None))(foods, grid), axis=0)
+    food_grid = jnp.sum(jax.vmap(place_food_on_grid, (0, None))(food, grid), axis=0)
     assert jnp.all(food_grid == expected_food_grid)
 
 
-def test_move(agent1: Agent, agents: Agent, foods: Food) -> None:
+def test_move(agent1: Agent, agents: Agent, food: Food) -> None:
     # Agent 1 is at [0, 1] and can move to [0, 0] or [0, 2].
     # But there is a food at [1, 1] so it cannot move there.
     grid_size = 3
     # Move agent 1 to [0, 2]
-    agent1_new = move(agent1, RIGHT, foods, agents, grid_size)
+    agent1_new = move(agent1, RIGHT, food, agents, grid_size)
     assert jnp.all(agent1_new.position == jnp.array([0, 2]))
 
     # Try move agent 1 into agent 0.
-    agent1_new = move(agent1, LEFT, foods, agents, grid_size)
+    agent1_new = move(agent1, LEFT, food, agents, grid_size)
     assert jnp.all(agent1_new.position == agent1.position)
 
     # Try move agent 1 into food 0.
-    agent1_new = move(agent1, DOWN, foods, agents, grid_size)
+    agent1_new = move(agent1, DOWN, food, agents, grid_size)
     assert jnp.all(agent1_new.position == agent1.position)
 
     # Try move agent 1 out of bounds.
-    agent1_new = move(agent1, UP, foods, agents, grid_size)
+    agent1_new = move(agent1, UP, food, agents, grid_size)
     assert jnp.all(agent1_new.position == agent1.position)
 
 

@@ -124,13 +124,13 @@ def test_grid_observer(state: State) -> None:
     observer = GridObserver(fov=3, grid_size=3, num_agents=2, num_food=2)
     # test eaten food is not visible
     eaten = jnp.array([True, False])
-    foods = Food(
+    food = Food(
         eaten=eaten,
-        id=state.foods.id,
-        position=state.foods.position,
-        level=state.foods.level,
+        id=state.food_items.id,
+        position=state.food_items.position,
+        level=state.food_items.level,
     )
-    state = state.replace(foods=foods)  # type: ignore
+    state = state.replace(food=food)  # type: ignore
 
     obs = observer.state_to_observation(state)
     expected_agent_2_view = jnp.array(
@@ -193,13 +193,13 @@ def test_vector_observer(state: State) -> None:
     observer = VectorObserver(fov=3, grid_size=3, num_agents=2, num_food=2)
     # test eaten food is not visible
     eaten = jnp.array([True, False])
-    foods = Food(
+    food = Food(
         eaten=eaten,
-        id=state.foods.id,
-        position=state.foods.position,
-        level=state.foods.level,
+        id=state.food_items.id,
+        position=state.food_items.position,
+        level=state.food_items.level,
     )
-    state = state.replace(foods=foods)  # type: ignore
+    state = state.replace(food=food)  # type: ignore
 
     obs = observer.state_to_observation(state)
     expected_agent_3_view = jnp.array(

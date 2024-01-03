@@ -35,7 +35,7 @@ def place_food_on_grid(food: Food, grid: chex.Array) -> chex.Array:
 
 
 def move(
-    agent: Agent, action: chex.Array, foods: Food, agents: Agent, grid_size: int
+    agent: Agent, action: chex.Array, food_items: Food, agents: Agent, grid_size: int
 ) -> Agent:
     """Return the new agent position after taking `action`.
 
@@ -44,28 +44,33 @@ def move(
     Args:
         agent: the agent to move.
         action: the action to take.
-        foods: all food in the grid.
+        food: all food in the grid.
         agents: all agents in the grid.
         grid_size: the size of the grid.
     """
     # Add action to agent position.
     new_position = agent.position + MOVES[action]
 
-    # If position is not in food/agent positions and not out of bounds, move agent.
-    out_of_bounds = (new_position < 0) | (new_position >= grid_size)
-    food_at_position = jnp.any(
-        jnp.all(new_position == foods.position, axis=1) & ~foods.eaten
-    )
+    # Check if the new position is out of bounds
+    out_of_bounds = jnp.any((new_position < 0) | (new_position >= grid_size))
+
+    # Check if the new position is occupied by food or another agent
     agent_at_position = jnp.any(
         jnp.all(new_position == agents.position, axis=1) & (agent.id != agents.id)
     )
-    entity_at_position = food_at_position | agent_at_position
-
-    return agent.replace(  # type: ignore
-        position=jnp.where(
-            out_of_bounds | entity_at_position, agent.position, new_position
-        )
+    food_at_position = jnp.any(
+        jnp.all(new_position == food_items.position, axis=1)
+        & jnp.invert(food_items.eaten)
     )
+    entity_at_position = jnp.any(agent_at_position | food_at_position)
+
+    # Move the agent to the new position if it's a valid position,
+    # otherwise keep the current position
+    new_agent_position = jnp.where(
+        out_of_bounds | entity_at_position, agent.position, new_position
+    )
+
+    return Agent(id=agent.id, position=new_agent_position, level=agent.level)
 
 
 def is_adj(a: Entity, b: Entity) -> chex.Array:

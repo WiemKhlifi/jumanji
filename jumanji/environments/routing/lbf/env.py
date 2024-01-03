@@ -45,7 +45,7 @@ class LevelBasedForaging(Environment[State]):
             `GridObserver`: returns an agent's view with a shape of
                             (num_agents, 3, 2 * fov + 1, 2 * fov +1).
             `VectorObserver`: returns an agent's view with a shape of
-                            (num_agents, 3 * num_foods + 3 * num_agents).
+                            (num_agents, 3 * num_food + 3 * num_agents).
             See the docs of those classes for more details.
         - action_mask: jax array (bool) of shape (num_agents, 6)
             indicates for each agent which of the size actions
@@ -59,10 +59,10 @@ class LevelBasedForaging(Environment[State]):
     - reward: jax array (float) of shape (num_agents,)
         When one or more agents load a food, the food level is rewarded to the agents weighted
         by the level of each agent. Then the reward is normalised so that at the end,
-        the sum of the rewards (if all foods have been picked-up) is one.
+        the sum of the rewards (if all food items have been picked-up) is one.
 
     - episode termination:
-        - All foods have been eaten.
+        - All food items have been eaten.
         - The number of steps is greater than the limit.
 
     - state: `State`
@@ -72,7 +72,7 @@ class LevelBasedForaging(Environment[State]):
                 - position: jax array (int32) of shape (2,).
                 - level: jax array (int32) of shape ().
                 - loading: jax array (bool) of shape ().
-        - foods: stacked pytree of `Food` objects of length `num_food`.
+        - food_items: stacked pytree of `Food` objects of length `num_food`.
             - Food:
                 - id: jax array (int32) of shape ().
                 - position: jax array (int32) of shape (2,).
@@ -234,8 +234,7 @@ class LevelBasedForaging(Environment[State]):
         moved_agents = jax.vmap(utils.move, (0, 0, None, None, None))(
             state.agents,
             actions,
-            state.foods,
-            state.agents,
+            state,
             self._grid_size,
         )
         # check that no two agent share the same position after moving.
@@ -247,22 +246,22 @@ class LevelBasedForaging(Environment[State]):
         )(moved_agents, actions)
 
         # eat food
-        foods, eaten_this_step, adj_loading_level = jax.vmap(utils.eat, (None, 0))(
-            moved_agents, state.foods
+        food_items, eaten_this_step, adj_loading_level = jax.vmap(utils.eat, (None, 0))(
+            moved_agents, state.food_items
         )
 
-        reward = self.get_reward(foods, adj_loading_level, eaten_this_step)
+        reward = self.get_reward(food_items, adj_loading_level, eaten_this_step)
 
         state = State(
             agents=moved_agents,
-            foods=foods,
+            food_items=food_items,
             step_count=state.step_count + 1,
             key=state.key,
         )
 
         observation = self._observer.state_to_observation(state)
         # First condition is truncation, second is termination.
-        terminate = jnp.all(state.foods.eaten)
+        terminate = jnp.all(state.food_items.eaten)
         truncate = state.step_count >= self.time_limit
 
         timestep = jax.lax.switch(
@@ -297,26 +296,26 @@ class LevelBasedForaging(Environment[State]):
 
     def _get_extra_info(self, state: State) -> Dict:
         """Computes extras metrics to be returned within the timestep."""
-        n_eaten = state.foods.eaten.sum()
-        percent_eaten = n_eaten / state.foods.eaten.size
+        n_eaten = state.food_items.eaten.sum()
+        percent_eaten = n_eaten / state.food_items.eaten.size
         extras = {"num_eaten": n_eaten, "percent_eaten": percent_eaten}
         return extras
 
     def get_reward(
-        self, foods: Food, adj_agent_levels: chex.Array, eaten: chex.Array
+        self, food_items: Food, adj_agent_levels: chex.Array, eaten: chex.Array
     ) -> chex.Array:
-        """Returns a reward for all agents given all foods.
+        """Returns a reward for all agents given all food items.
 
         Args:
-            foods (Food): All the foods in the environment.
-            adj_agent_levels (chex.Array): The level of all agents adjacent to all foods.
+            food (Food): All the food items in the environment.
+            adj_agent_levels (chex.Array): The level of all agents adjacent to all food items.
             eaten (chex.Array): Whether the food was eaten or not (this step).
         """
-        # Get reward per food for all foods and agents (by vmapping over foods).
+        # Get reward per food for all food items and agents (by vmapping over foods).
         # Then sum that reward on agent dim to get reward per agent.
         return jnp.sum(
             jax.vmap(self._reward_per_food, in_axes=(0, 0, 0, None))(
-                foods, adj_agent_levels, eaten, jnp.sum(foods.level)
+                food_items, adj_agent_levels, eaten, jnp.sum(food_items.level)
             ),
             axis=(0),
         )
@@ -353,7 +352,7 @@ class LevelBasedForaging(Environment[State]):
         The GridObserver returns an agent's view with a shape of
             (num_agents, 3, 2 * fov + 1, 2 * fov +1).
         The VectorObserver returns an agent's view with a shape of
-        (num_agents, 3 * num_foods + 3 * num_agents).
+        (num_agents, 3 * num_food + 3 * num_agents).
         See a more detailed description of the observations in the docs
         of `GridObserver` and `VectorObserver`.
 

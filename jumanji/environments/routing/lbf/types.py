@@ -72,13 +72,13 @@ class State:
     Holds the dynamics of the LBF environment.
 
     agents: a stacked pytree of Agents - all the agents in the environment.
-    foods: a stacked pytree of Foods - all the foods in the environment.
+    food: a stacked pytree of Food - all the food in the environment.
     step_count: the index of the current step.
     key: random key used for auto-reset.
     """
 
-    agents: Agent  # (num_agents, ...)
-    foods: Food  # (num_foods, ...)
+    agents: Agent  # List of Agent entities (pytree structure)
+    food_items: Food  # List of Food entities (pytree structure)
     step_count: chex.Array  # ()
     key: chex.PRNGKey  # (2,)
 

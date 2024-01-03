@@ -99,13 +99,13 @@ def agents(agent0: Agent, agent1: Agent, agent2: Agent, agent3: Agent) -> Agent:
 
 
 @pytest.fixture
-def foods(food0: Food, food1: Food) -> Food:
+def food(food0: Food, food1: Food) -> Food:
     return tree_transpose([food0, food1])
 
 
 @pytest.fixture
-def state(agents: Agent, foods: Food, key: chex.PRNGKey) -> State:
-    return State(agents=agents, foods=foods, step_count=0, key=key)
+def state(agents: Agent, food_items: Food, key: chex.PRNGKey) -> State:
+    return State(agents=agents, food_items=food_items, step_count=0, key=key)
 
 
 @pytest.fixture

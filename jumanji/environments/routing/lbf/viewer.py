@@ -99,7 +99,7 @@ class LevelBasedForagingViewer(Viewer):
         Returns:
             Animation that can be saved as a GIF, MP4, or rendered with HTML.
         """
-        fig = plt.figure(f"{self._name}Animation", figsize=constants._FIGURE_SIZE)
+        fig = plt.figure(f"{self._name}Animation", figsize=constants.FIGURE_SIZE)
         fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
         ax = fig.add_subplot(111)
         plt.close(fig)
@@ -135,7 +135,7 @@ class LevelBasedForagingViewer(Viewer):
 
     def _get_fig_ax(self) -> Tuple[plt.Figure, plt.Axes]:
         recreate = not plt.fignum_exists(self._name)
-        fig = plt.figure(self._name, figsize=constants._FIGURE_SIZE, facecolor="black")
+        fig = plt.figure(self._name, figsize=constants.FIGURE_SIZE, facecolor="black")
         fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
 
         if recreate:
@@ -160,7 +160,7 @@ class LevelBasedForagingViewer(Viewer):
 
     def _draw_state(self, ax: plt.Axes, state: State) -> None:
         self._draw_grid(ax)
-        self._draw_foods(state.foods, ax)
+        self._draw_food(state.food, ax)
         self._draw_agents(state.agents, ax)
 
     def _draw_grid(self, ax: plt.Axes) -> None:
@@ -226,12 +226,12 @@ class LevelBasedForagingViewer(Viewer):
             # Add a rectangle (polygon) next to the agent with the agent's level
             self.draw_badge(agent, ax, cell_center)
 
-    def _draw_foods(self, foods: Food, ax: plt.Axes) -> None:
-        """Draw the foods on the grid."""
-        num_foods = len(foods.level)
+    def _draw_food(self, food: Food, ax: plt.Axes) -> None:
+        """Draw the food on the grid."""
+        num_food = len(food.level)
 
-        for i in range(num_foods):
-            food = tree_slice(foods, i)
+        for i in range(num_food):
+            food = tree_slice(food, i)
             if food.eaten:
                 continue
 

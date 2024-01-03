@@ -43,22 +43,22 @@ def test_generator() -> None:
     )
     state = gen(key)
 
-    # Test foods and agents placed within grid bounds.
+    # Test food and agents placed within grid bounds.
     assert jnp.all(state.agents.position >= 0)
     assert jnp.all(state.agents.position < grid_size)
-    assert jnp.all(state.foods.position >= 0)
-    assert jnp.all(state.foods.position < grid_size)
+    assert jnp.all(state.food_items.position >= 0)
+    assert jnp.all(state.food_items.position < grid_size)
 
-    # test no foods are adjacent to eachother
+    # test no foods are adjacent to each other
     adjaciencies = jax.vmap(jax.vmap(is_adj, in_axes=(0, None)), in_axes=(None, 0))(
-        state.foods.position, state.foods.position
+        state.food_items.position, state.food_items.position
     )
     assert jnp.all(~adjaciencies)
 
     # test no foods are on the edge of the grid
-    assert jnp.all(state.foods.position != 0)
-    assert jnp.all(state.foods.position != grid_size - 1)
+    assert jnp.all(state.food_items.position != 0)
+    assert jnp.all(state.food_items.position != grid_size - 1)
 
     # test that food levels aren't too high to be eaten
-    assert jnp.all(state.foods.level <= jnp.sum(state.agents.level))
-    assert jnp.all(state.foods.level >= num_food)
+    assert jnp.all(state.food_items.level <= jnp.sum(state.agents.level))
+    assert jnp.all(state.food_items.level >= num_food)

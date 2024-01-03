@@ -13,4 +13,5 @@
 # limitations under the License.
 
 from jumanji.environments.routing.lbf.env import LevelBasedForaging
+from jumanji.environments.routing.lbf.observer import GridObserver, VectorObserver
 from jumanji.environments.routing.lbf.types import Observation, State
