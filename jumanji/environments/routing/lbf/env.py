@@ -234,7 +234,8 @@ class LevelBasedForaging(Environment[State]):
         moved_agents = jax.vmap(utils.move, (0, 0, None, None, None))(
             state.agents,
             actions,
-            state,
+            state.food_items,
+            state.agents,
             self._grid_size,
         )
         # check that no two agent share the same position after moving.
