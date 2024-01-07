@@ -31,9 +31,9 @@ class Generator(abc.ABC):
         grid_size: int,
         fov: int,
         num_agents: int,
-        num_food: int,
+        num_food: int,        
         max_agent_level: int,
-        force_coop: bool = False,
+        force_coop: bool,
     ) -> None:
         """Initialises a LBF generator, used to generate grids for the LBF environment.
 
@@ -47,10 +47,10 @@ class Generator(abc.ABC):
         """
         # Add assertions to check the validity of the input values.
         assert 5 <= grid_size < 20, "Grid size must be between 5 and 19."
-        assert 0 < fov <= grid_size, "Field of view must be greater than 0."
-        assert 1 <= num_agents < 20, "Number of agents must be between 1 and 19."
+        assert 2 <= fov <= grid_size, "Field of view must be between 2 and grid_size."
+        assert 2 <= num_agents < 20, "Number of agents must be between 1 and 19."
         assert 1 <= num_food < 10, "Number of food items must be between 1 and 10."
-        assert max_agent_level > 0, "Maximum agent level must be greater than 0."
+        assert max_agent_level >= 2, "Maximum agent level must be equal or greater to 2."
 
         if fov is None:
             fov = grid_size
@@ -84,13 +84,15 @@ class RandomGenerator(Generator):
         fov: int,
         num_agents: int,
         num_food: int,
-        max_agent_level: int,
-        force_coop: bool,
+        max_agent_level: int = 2,
+        force_coop: bool = False,
     ) -> None:
         """Initialises an lbf generator, used to generate grids for
         the LevelBasedForaging environment."""
         super().__init__(
-            grid_size, fov, num_agents, num_food, max_agent_level, force_coop
+            grid_size=grid_size, fov=fov, num_agents=num_agents, 
+            num_food=num_food, max_agent_level=max_agent_level, 
+            force_coop=force_coop
         )
 
     def sample_food(self, key: chex.PRNGKey) -> chex.Array:

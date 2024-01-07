@@ -130,8 +130,7 @@ class LevelBasedForaging(Environment[State]):
             fov=8,
             num_agents=2,
             num_food=2,
-            max_agent_level=2,
-            force_coop=False,
+            force_coop=True,
         )
         self._time_limit = time_limit
         self._grid_size = self._generator.grid_size
