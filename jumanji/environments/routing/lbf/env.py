@@ -100,8 +100,8 @@ class LevelBasedForaging(Environment[State]):
         generator: Optional[Generator] = None,
         viewer: Optional[Viewer[State]] = None,
         time_limit: int = 500,
-        normalize_reward: bool = True,
         grid_observation: bool = False,
+        normalize_reward: bool = True,
         penalty: float = 0.0,
     ) -> None:
         """
@@ -160,7 +160,7 @@ class LevelBasedForaging(Environment[State]):
 
         # create viewer for rendering environment
         self._viewer = viewer or LevelBasedForagingViewer(
-            self._grid_size, "LevelBasedForaging"
+            (self._grid_size, self._grid_size), "LevelBasedForaging"
         )
 
     @property

@@ -47,12 +47,10 @@ class LevelBasedForagingViewer(Viewer):
             name: custom name for the Viewer. Defaults to `LevelBasedForaging`.
         """
         self._name = name
-        self.rows = self.cols = grid_size
-        self.grid_size = 50
+        self.rows, self.cols = grid_size
+        self.grid_size = 30
 
-        self.cell_size = self.grid_size
-        self.icon_size = self.cell_size / 3
-        self.adjust_center = self.cell_size / 2
+        self.icon_size = self.grid_size*5 / self.rows
 
         self.width = 1 + self.cols * (self.grid_size + 1)
         self.height = 1 + self.rows * (self.grid_size + 1)
@@ -99,7 +97,7 @@ class LevelBasedForagingViewer(Viewer):
         Returns:
             Animation that can be saved as a GIF, MP4, or rendered with HTML.
         """
-        fig = plt.figure(f"{self._name}Animation", figsize=constants.FIGURE_SIZE)
+        fig = plt.figure(f"{self._name}Animation", figsize=constants._FIGURE_SIZE, facecolor=constants._GRID_COLOR)
         fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
         ax = fig.add_subplot(111)
         plt.close(fig)
@@ -135,7 +133,7 @@ class LevelBasedForagingViewer(Viewer):
 
     def _get_fig_ax(self) -> Tuple[plt.Figure, plt.Axes]:
         recreate = not plt.fignum_exists(self._name)
-        fig = plt.figure(self._name, figsize=constants.FIGURE_SIZE, facecolor="black")
+        fig = plt.figure(self._name, figsize=constants._FIGURE_SIZE, facecolor=constants._GRID_COLOR)
         fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
 
         if recreate:
@@ -160,31 +158,27 @@ class LevelBasedForagingViewer(Viewer):
 
     def _draw_state(self, ax: plt.Axes, state: State) -> None:
         self._draw_grid(ax)
-        self._draw_food(state.food, ax)
+        self._draw_food(state.food_items, ax)
         self._draw_agents(state.agents, ax)
 
     def _draw_grid(self, ax: plt.Axes) -> None:
-        """Draw grid of warehouse floor."""
-        lines = []
-        # VERTICAL LINES
-        for r in range(self.rows + 1):
-            lines.append(
-                [
-                    (0, (self.grid_size + 1) * r + 1),
-                    ((self.grid_size + 1) * self.cols, (self.grid_size + 1) * r + 1),
-                ]
-            )
-
+        """Draw the grid."""
+        lines = [
+            [
+                (0, (self.grid_size + 1) * r + 1),
+                ((self.grid_size + 1) * self.cols, (self.grid_size + 1) * r + 1),
+            ]
+            for r in range(self.rows + 1)
+        ]
         # HORIZONTAL LINES
-        for c in range(self.cols + 1):
-            lines.append(
-                [
-                    ((self.grid_size + 1) * c + 1, 0),
-                    ((self.grid_size + 1) * c + 1, (self.grid_size + 1) * self.rows),
-                ]
-            )
-
-        lc = LineCollection(lines, colors=(1, 1, 1))
+        lines.extend(
+            [
+                ((self.grid_size + 1) * c + 1, 0),
+                ((self.grid_size + 1) * c + 1, (self.grid_size + 1) * self.rows),
+            ]
+            for c in range(self.cols + 1)
+        )
+        lc = LineCollection(lines, colors=(constants._LINE_COLOR,))
         ax.add_collection(lc)
 
     def _display_human(self, fig: plt.Figure) -> None:
@@ -211,95 +205,87 @@ class LevelBasedForagingViewer(Viewer):
             cell_center = self._entity_position(agent)
 
             # Read the image file
-            img = mpimg.imread("icons/agent.png")
-
-            # Resize the image
-            # img_resized = resize(img, (self.icon_size, self.icon_size))
+            img = mpimg.imread("jumanji/environments/routing/lbf/icons/agent.png")
 
             # Create an OffsetImage and add it to the axis
-            imagebox = OffsetImage(img, zoom=self.icon_size / self.cell_size)
+            imagebox = OffsetImage(img, zoom=self.icon_size / self.grid_size)
             ab = AnnotationBbox(
-                imagebox, (cell_center[0], cell_center[1]), frameon=False, zorder=10
+                imagebox, (cell_center[0], cell_center[1]), frameon=False, zorder=0
             )
             ax.add_artist(ab)
 
             # Add a rectangle (polygon) next to the agent with the agent's level
-            self.draw_badge(agent, ax, cell_center)
+            self.draw_badge(agent.level, cell_center, ax)
 
-    def _draw_food(self, food: Food, ax: plt.Axes) -> None:
+    def _draw_food(self, food_items: Food, ax: plt.Axes) -> None:
         """Draw the food on the grid."""
-        num_food = len(food.level)
+        num_food = len(food_items.level)
 
         for i in range(num_food):
-            food = tree_slice(food, i)
+            food = tree_slice(food_items, i)
             if food.eaten:
                 continue
 
             # Read the image file
-            img = mpimg.imread("icons/apple.png")
+            img = mpimg.imread("jumanji/environments/routing/lbf/icons/apple.png")
             cell_center = self._entity_position(food)
+            self.draw_badge(food.level, cell_center, ax)
+            
 
             # Create an OffsetImage and add it to the axis
-            imagebox = OffsetImage(img, zoom=self.icon_size / self.cell_size)
+            imagebox = OffsetImage(img, zoom=self.icon_size / self.grid_size)
             ab = AnnotationBbox(
-                imagebox, (cell_center[0], cell_center[1]), frameon=False, zorder=10
+                imagebox, (cell_center[0], cell_center[1]), frameon=False, zorder=0
             )
             ax.add_artist(ab)
 
             # Add a rectangle (polygon) next to the agent with the food's level
-            self.draw_badge(food, ax, cell_center)
 
     def _entity_position(self, entity: Entity) -> Tuple[float, float]:
         """Return the position of an entity on the grid."""
         row, col = entity.position
+        row = self.rows - row - 1  # pyglet rendering is reversed
+        x_center = (self.grid_size + 1) * col + self.grid_size // 2 + 1
+        y_center = (self.grid_size + 1) * row + self.grid_size // 2 + 1
         return (
-            (row + 1) * self.cell_size + row - self.adjust_center,
-            (col + 1) * self.cell_size + col - self.adjust_center,
+            x_center,
+            y_center,
         )
 
-    def draw_badge(
-        self, entity: Entity, ax: plt.Axes, anchor_point: Tuple[float, float]
-    ) -> None:
-        #   resolution = 6
-        #   radius = self.grid_size / 5
+    def draw_badge(self, level: int, anchor_point: Tuple[float, float], ax: plt.Axes)-> None:
+        resolution = 6
+        radius = self.grid_size / 6
 
-        #   badge_x = anchor_point[0] * self.grid_size + (3 / 4) * self.grid_size
-        #   badge_y = self.height - self.grid_size * (anchor_point[1] + 1) + (1 / 4) * self.grid_size
-
+        badge_center_x = anchor_point[0] + self.grid_size / 3 - 3
+        badge_center_y = anchor_point[1] - self.grid_size / 3 
+        
         # make a circle
-        #   verts = []
-        #   for i in range(resolution):
-        #       angle = 2 * np.pi * i / resolution
-        #       x = radius * np.cos(angle) + badge_x
-        #       y = radius * np.sin(angle) + badge_y
-        #       verts += [[x, y]]
+        verts = []
+        for i in range(resolution):
+            angle = 2 * np.pi * i / resolution
 
-        #       circle = plt.Polygon(
-        #               verts,
-        #               edgecolor="white",
-        #               facecolor="white",
-        #           )
+            x_radius = radius * np.cos(angle)
+            x = x_radius + badge_center_x + 1
 
-        # ax.add_patch(circle)
-        # Calculate the center of the rectangle
-        center_x = anchor_point[0] + self.cell_size / 3
-        center_y = anchor_point[1] - self.cell_size / 3
+            y_radius = radius * np.sin(angle) + 1
+            y = y_radius + badge_center_y
+            verts += [[x, y]]
 
-        rectangle = plt.Rectangle(
-            xy=(center_x, center_y),
-            width=self.cell_size / 3,
-            height=self.cell_size / 3,
-            edgecolor="white",
-            facecolor="black",
-            zorder=10,  # Adjust zorder to ensure the rectangle is drawn below images
-        )
-        ax.add_patch(rectangle)
+            circle = plt.Polygon(
+                verts,
+                edgecolor="white",
+                facecolor=constants._GRID_COLOR,
+            )
+
+        ax.add_patch(circle)
 
         ax.annotate(
-            str(entity.level),
-            xy=(center_x + 10, center_y + 10),
-            color="white",
-            ha="center",
-            va="center",
-            zorder=12,
+            str(level),
+            xy=(badge_center_x+1, badge_center_y+1),
+            color='white',
+            ha='center',
+            va='center',
+            zorder=10,
+            fontsize= 10 if self.rows<10 else 6,
+            weight='bold'
         )

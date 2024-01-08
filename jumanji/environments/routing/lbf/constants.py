@@ -25,7 +25,8 @@ LOAD = 5
 MOVES = jnp.array([[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1], [0, 0]])
 
 # viewer constants
-FIGURE_SIZE = (5, 5)
+_FIGURE_SIZE = (5, 5)
 
 # Define some colors for visualization.
-GRID_COLOR = (0, 0, 0)  # black
+_GRID_COLOR = (0, 0, 0)  # black
+_LINE_COLOR = (1, 1, 1)  # white
