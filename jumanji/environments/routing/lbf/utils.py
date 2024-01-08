@@ -21,7 +21,6 @@ import jax.numpy as jnp
 from jumanji.environments.routing.lbf.constants import LOAD, MOVES
 from jumanji.environments.routing.lbf.types import Agent, Entity, Food
 
-
 def are_entities_adjacent(entity_a: Entity, entity_b: Entity) -> chex.Array:
     """
     Check if two entities are adjacent in the grid.
