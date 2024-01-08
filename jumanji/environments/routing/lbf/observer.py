@@ -35,6 +35,19 @@ class LbfObserver(abc.ABC):
     def __init__(
         self, fov: int, grid_size: int, num_agents: int, num_food: int
     ) -> None:
+        """
+        Initializes the Observer object.
+
+        Args:
+            fov (int): The field of view of the agents.
+            grid_size (int): The size of the grid.
+            num_agents (int): The number of agents in the environment.
+            num_food (int): The number of food items in the environment.
+
+        Returns:
+            None
+        """
+
         self.fov = fov
         self.grid_size = grid_size
         self.num_agents = num_agents
@@ -60,7 +73,7 @@ class LbfObserver(abc.ABC):
     ) -> specs.BoundedArray:
         """Returns the action mask spec for the environment.
 
-        The action mask is a boolean array of shape (num_agents, 6). 6 is the number of actions.
+        The action mask is a boolean array of shape (num_agents, 6). '6' is the number of actions.
         """
         return specs.BoundedArray(
             shape=(self.num_agents, 6),
@@ -198,30 +211,35 @@ class VectorObserver(LbfObserver):
 
         # Get action mask
         next_positions = agent.position + MOVES
-        # Check if any agent is in a next position
-        agent_occupied = jax.vmap(
-            lambda next_pos: jnp.any(
-                jnp.all(next_pos == state.agents.position, axis=-1)
-                # The agent doesn't block itself
-                & (state.agents.id != agent.id)
-            )
-        )(next_positions)
+        check_pos_fn = lambda next_pos, entities, condition: jnp.any(
+            jnp.all(next_pos == entities.position, axis=-1) & condition
+        )
 
-        # Check if any food is in a next position
-        food_occupied = jax.vmap(
-            lambda next_pos: jnp.any(
-                jnp.all(next_pos == state.food_items.position, axis=-1)
-                & ~state.food_items.eaten  # Food must be uneaten to collide
-            )
-        )(next_positions)
+        # Check if any agent is in a next position (condition: The agent doesn't block itself)
+        agent_occupied = jax.vmap(check_pos_fn, (0, None, None))(
+            next_positions, state.agents, (state.agents.id != agent.id)
+        )
+
+        # Check if any food is in a next position (condition: Food must be uneaten)
+        food_occupied = jax.vmap(check_pos_fn, (0, None, None))(
+            next_positions, state.food_items, ~state.food_items.eaten
+        )
 
         # Check if the next position is out of bounds
         out_of_bounds = jnp.any(
             (next_positions < 0) | (next_positions >= self.grid_size), axis=-1
         )
 
-        occupied = food_occupied | agent_occupied
-        action_mask = ~(occupied | out_of_bounds)
+        action_mask = ~(food_occupied | agent_occupied | out_of_bounds)
+
+        # Check if the agent can load food (only if placed in the neighborhood)
+        num_adj_food = (
+            jax.vmap(utils.are_entities_adjacent, (0, None))(state.food_items, agent)
+            & ~state.food_items.eaten
+        )
+        is_food_adj = jnp.where(jnp.sum(num_adj_food) > 0, True, False)
+
+        action_mask = jnp.where(is_food_adj, action_mask, action_mask.at[-1].set(False))
 
         return action_mask
 
@@ -243,10 +261,13 @@ class VectorObserver(LbfObserver):
         )
 
         # Calculate which foods are within the FOV of the current agent and are not eaten.
-        visible_foods = jnp.all(
-            jnp.abs(agent.position - state.food_items.position) <= self.fov,
-            axis=-1,
-        ) & jnp.invert(state.food_items.eaten)
+        visible_foods = (
+            jnp.all(
+                jnp.abs(agent.position - state.food_items.position) <= self.fov,
+                axis=-1,
+            )
+            & ~state.food_items.eaten
+        )
 
         # Placeholder observation for foods and agents
         # this is shown if food or agent is not in view.
@@ -314,7 +335,7 @@ class VectorObserver(LbfObserver):
     ) -> specs.Spec[Observation]:
         max_ob = jnp.max(jnp.array([max_food_level, max_agent_level]))
         agents_view = specs.BoundedArray(
-            shape=(self.num_agents, self.num_agents * 3 + self.num_food * 3),
+            shape=(self.num_agents, 3 * (self.num_agents + self.num_food)),
             dtype=jnp.int32,
             name="agents_view",
             minimum=-1,

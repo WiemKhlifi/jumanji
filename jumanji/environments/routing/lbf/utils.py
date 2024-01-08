@@ -18,37 +18,92 @@ import chex
 import jax
 import jax.numpy as jnp
 
-from jumanji.environments.routing.lbf.constants import MOVES
+from jumanji.environments.routing.lbf.constants import LOAD, MOVES
 from jumanji.environments.routing.lbf.types import Agent, Entity, Food
 
 
-def place_agent_on_grid(agent: Agent, grid: chex.Array) -> chex.Array:
-    """Return the grid with the agent placed on it."""
-    x, y = agent.position
-    return grid.at[x, y].set(agent.level)
-
-
-def place_food_on_grid(food: Food, grid: chex.Array) -> chex.Array:
-    """Return the grid with the food placed on it."""
-    x, y = food.position
-    return grid.at[x, y].set(food.level * ~food.eaten)  # 0 if eaten else level
-
-
-def move(
-    agent: Agent, action: chex.Array, food_items: Food, agents: Agent, grid_size: int
-) -> Agent:
-    """Return the new agent position after taking `action`.
-
-    Agents cannot move to a position that is occupied by food, other agent or is out of bounds.
+def are_entities_adjacent(entity_a: Entity, entity_b: Entity) -> chex.Array:
+    """
+    Check if two entities are adjacent in the grid.
 
     Args:
-        agent: the agent to move.
-        action: the action to take.
-        food: all food in the grid.
-        agents: all agents in the grid.
-        grid_size: the size of the grid.
+        entity_a (Entity): The first entity.
+        entity_b (Entity): The second entity.
+
+    Returns:
+        chex.Array: True if entities are adjacent, False otherwise.
     """
-    # Add action to agent position.
+    distance = jnp.abs(entity_a.position - entity_b.position)
+    return jnp.where(jnp.sum(distance) == 1, True, False)
+
+
+def flag_duplicates(a: chex.Array) -> chex.Array:
+    """Return a boolean array indicating which elements of `a` are duplicates.
+
+    Example:
+        a = jnp.array([1, 2, 3, 2, 1, 5])
+        flag_duplicates(a)  # jnp.array([True, False, True, False, True, True])
+    """
+    # https://stackoverflow.com/a/11528078/5768407
+    _, indices, counts = jnp.unique(
+        a, return_inverse=True, return_counts=True, size=len(a), axis=0
+    )
+    return ~(counts[indices] == 1)
+
+
+def update_agent_positions(
+    agents: Agent, actions: chex.Array, food_items: Food, grid_size: int
+) -> Agent:
+    """
+    Update agent positions based on actions, resolve collisions, and set loading status.
+
+    Args:
+        agents (Agent): The current state of agents.
+        actions (chex.Array): Actions taken by agents.
+        food_items (Food): All food items in the grid.
+        grid_size (int): The size of the grid.
+
+    Returns:
+        Agent: Agents with updated positions and loading status.
+    """
+    # Move the agent to a valid position
+    moved_agents = jax.vmap(simulate_agent_movement, (0, 0, None, None, None))(
+        agents,
+        actions,
+        food_items,
+        agents,
+        grid_size,
+    )
+
+    # Fix collisions
+    moved_agents = fix_collisions(moved_agents, agents)
+
+    # set agent's loading status
+    moved_agents = jax.vmap(
+        lambda agent, action: agent.replace(loading=(action == LOAD))
+    )(moved_agents, actions)
+
+    return moved_agents
+
+
+def simulate_agent_movement(
+    agent: Agent, action: chex.Array, food_items: Food, agents: Agent, grid_size: int
+) -> Agent:
+    """
+    Move the agent based on the specified action.
+
+    Args:
+        agent (Agent): The agent to move.
+        action (chex.Array): The action to take.
+        food_items (Food): All food items in the grid.
+        agents (Agent): All agents in the grid.
+        grid_size (int): The size of the grid.
+
+    Returns:
+        Agent: The agent with its updated position.
+    """
+
+    # Calculate the new position based on the chosen action
     new_position = agent.position + MOVES[action]
 
     # Check if the new position is out of bounds
@@ -59,8 +114,7 @@ def move(
         jnp.all(new_position == agents.position, axis=1) & (agent.id != agents.id)
     )
     food_at_position = jnp.any(
-        jnp.all(new_position == food_items.position, axis=1)
-        & jnp.invert(food_items.eaten)
+        jnp.all(new_position == food_items.position, axis=1) & ~food_items.eaten
     )
     entity_at_position = jnp.any(agent_at_position | food_at_position)
 
@@ -70,15 +124,43 @@ def move(
         out_of_bounds | entity_at_position, agent.position, new_position
     )
 
+    # Return the agent with the updated position
     return Agent(id=agent.id, position=new_agent_position, level=agent.level)
 
 
-def is_adj(a: Entity, b: Entity) -> chex.Array:
-    """Return whether `a` and `b` are adjacent."""
-    # todo: would it be quicker to just:
-    # (abs(a.position[0] - b.position[0]) == 1 and a.position[1] == b.position[1]) ||
-    # (a.position[0] == b.position[0] and abs(a.position[1] - b.position[1]) == 1)
-    return jnp.linalg.norm(a.position - b.position, axis=-1) == 1
+def fix_collisions(moved_agents: Agent, original_agents: Agent) -> Agent:
+    """
+    Fix collisions in the moved agents by resolving conflicts with the original agents.
+    If a number 'N' of agents end up in the same position after the move, the initial
+    position of the agents is retained.
+
+    Args:
+        moved_agents (Agent): Agents with potentially updated positions.
+        original_agents (Agent): Original agents with their initial positions.
+
+    Returns:
+        Agent: Agents with collisions resolved.
+    """
+    # Detect duplicate positions
+    duplicates = flag_duplicates(moved_agents.position)
+    # Broadcast duplicates for correct shape
+    duplicates = jnp.broadcast_to(duplicates[:, None], original_agents.position.shape)
+
+    # If there are duplicates, use the original agent position.
+    new_positions = jnp.where(
+        duplicates,
+        original_agents.position,
+        moved_agents.position,
+    )
+
+    # Recreate agents with new positions
+    agents: Agent = jax.vmap(Agent)(
+        id=original_agents.id,
+        position=new_positions,
+        level=original_agents.level,
+        loading=original_agents.loading,
+    )
+    return agents
 
 
 def eat(agents: Agent, food: Food) -> Tuple[Food, chex.Array, chex.Array]:
@@ -96,7 +178,7 @@ def eat(agents: Agent, food: Food) -> Tuple[Food, chex.Array, chex.Array]:
 
     def get_adj_level(agent: Agent, food: Food) -> chex.Array:
         """Return the level of the agent if it is adjacent to the food, else 0."""
-        return jax.lax.select(is_adj(agent, food), agent.level, 0)
+        return jax.lax.select(are_entities_adjacent(agent, food), agent.level, 0)
 
     # get the level of all adjacent agents, if an agent is not adjacent, it's level is 0
     adjacent_levels = jax.vmap(get_adj_level, (0, None))(agents, food)
@@ -111,44 +193,16 @@ def eat(agents: Agent, food: Food) -> Tuple[Food, chex.Array, chex.Array]:
     return new_food, food_eaten_this_step, adjacent_loading_levels
 
 
-def flag_duplicates(a: chex.Array) -> chex.Array:
-    """Return a boolean array indicating which elements of `a` are duplicates.
-
-    Example:
-        a = jnp.array([1, 2, 3, 2, 1, 5])
-        flag_duplicates(a)  # jnp.array([True, False, True, False, True, True])
-    """
-    # https://stackoverflow.com/a/11528078/5768407
-    _, indices, counts = jnp.unique(
-        a, return_inverse=True, return_counts=True, size=len(a), axis=0
-    )
-    return ~(counts[indices] == 1)
+def place_agent_on_grid(agent: Agent, grid: chex.Array) -> chex.Array:
+    """Return the grid with the agent placed on it."""
+    x, y = agent.position
+    return grid.at[x, y].set(agent.level)
 
 
-def fix_collisions(moved_agents: Agent, orig_agents: Agent) -> Agent:
-    """Return agents with collisions fixed.
-
-    If two agents are in the same position use the original agent position.
-    """
-    duplicates = flag_duplicates(moved_agents.position)
-    # Need to broadcast this so the `jnp.where` works correctly.
-    duplicates = jnp.broadcast_to(duplicates[:, None], orig_agents.position.shape)
-
-    # If there are duplicates, use the original agent position.
-    new_positions = jnp.where(
-        duplicates,
-        orig_agents.position,
-        moved_agents.position,
-    )
-
-    # Recreate agents with new positions.
-    agents: Agent = jax.vmap(Agent)(
-        id=orig_agents.id,
-        position=new_positions,
-        level=orig_agents.level,
-        loading=orig_agents.loading,
-    )
-    return agents
+def place_food_on_grid(food: Food, grid: chex.Array) -> chex.Array:
+    """Return the grid with the food placed on it."""
+    x, y = food.position
+    return grid.at[x, y].set(food.level * ~food.eaten)  # 0 if eaten else level
 
 
 def slice_around(pos: chex.Array, fov: int) -> Tuple[chex.Array, chex.Array]:
@@ -168,7 +222,5 @@ def slice_around(pos: chex.Array, fov: int) -> Tuple[chex.Array, chex.Array]:
 
 def calculate_num_observation_features(num_food: int, num_agents: int) -> chex.Array:
     """Calculate the number of features in an agent view"""
-    num_obs_food = 3 * num_food
-    num_obs_agent = 3 * num_agents
-    obs_features = num_obs_food + num_obs_agent
+    obs_features = 3 * (num_food + num_agents)
     return jnp.array(obs_features, jnp.int32)

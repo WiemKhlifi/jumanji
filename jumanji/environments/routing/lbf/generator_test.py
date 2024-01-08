@@ -19,7 +19,7 @@ import jax.numpy as jnp
 from jumanji.environments.routing.lbf.generator import RandomGenerator
 
 
-def is_adj(pos0: chex.Array, pos1: chex.Array) -> chex.Array:
+def are_entities_adjacent(pos0: chex.Array, pos1: chex.Array) -> chex.Array:
     return jnp.linalg.norm(pos0 - pos1) == 1
 
 
@@ -50,9 +50,9 @@ def test_generator() -> None:
     assert jnp.all(state.food_items.position < grid_size)
 
     # test no foods are adjacent to each other
-    adjaciencies = jax.vmap(jax.vmap(is_adj, in_axes=(0, None)), in_axes=(None, 0))(
-        state.food_items.position, state.food_items.position
-    )
+    adjaciencies = jax.vmap(
+        jax.vmap(are_entities_adjacent, in_axes=(0, None)), in_axes=(None, 0)
+    )(state.food_items.position, state.food_items.position)
     assert jnp.all(~adjaciencies)
 
     # test no foods are on the edge of the grid

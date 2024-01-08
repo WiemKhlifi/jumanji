@@ -50,7 +50,7 @@ class LevelBasedForagingViewer(Viewer):
         self.rows, self.cols = grid_size
         self.grid_size = 30
 
-        self.icon_size = self.grid_size*5 / self.rows
+        self.icon_size = self.grid_size * 5 / self.rows
 
         self.width = 1 + self.cols * (self.grid_size + 1)
         self.height = 1 + self.rows * (self.grid_size + 1)
@@ -97,7 +97,11 @@ class LevelBasedForagingViewer(Viewer):
         Returns:
             Animation that can be saved as a GIF, MP4, or rendered with HTML.
         """
-        fig = plt.figure(f"{self._name}Animation", figsize=constants._FIGURE_SIZE, facecolor=constants._GRID_COLOR)
+        fig = plt.figure(
+            f"{self._name}Animation",
+            figsize=constants._FIGURE_SIZE,
+            facecolor=constants._GRID_COLOR,
+        )
         fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
         ax = fig.add_subplot(111)
         plt.close(fig)
@@ -133,7 +137,9 @@ class LevelBasedForagingViewer(Viewer):
 
     def _get_fig_ax(self) -> Tuple[plt.Figure, plt.Axes]:
         recreate = not plt.fignum_exists(self._name)
-        fig = plt.figure(self._name, figsize=constants._FIGURE_SIZE, facecolor=constants._GRID_COLOR)
+        fig = plt.figure(
+            self._name, figsize=constants._FIGURE_SIZE, facecolor=constants._GRID_COLOR
+        )
         fig.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
 
         if recreate:
@@ -230,7 +236,6 @@ class LevelBasedForagingViewer(Viewer):
             img = mpimg.imread("jumanji/environments/routing/lbf/icons/apple.png")
             cell_center = self._entity_position(food)
             self.draw_badge(food.level, cell_center, ax)
-            
 
             # Create an OffsetImage and add it to the axis
             imagebox = OffsetImage(img, zoom=self.icon_size / self.grid_size)
@@ -252,13 +257,15 @@ class LevelBasedForagingViewer(Viewer):
             y_center,
         )
 
-    def draw_badge(self, level: int, anchor_point: Tuple[float, float], ax: plt.Axes)-> None:
+    def draw_badge(
+        self, level: int, anchor_point: Tuple[float, float], ax: plt.Axes
+    ) -> None:
         resolution = 6
         radius = self.grid_size / 6
 
         badge_center_x = anchor_point[0] + self.grid_size / 3 - 3
-        badge_center_y = anchor_point[1] - self.grid_size / 3 
-        
+        badge_center_y = anchor_point[1] - self.grid_size / 3
+
         # make a circle
         verts = []
         for i in range(resolution):
@@ -278,14 +285,14 @@ class LevelBasedForagingViewer(Viewer):
             )
 
         ax.add_patch(circle)
-
+        fontsize = 10 if self.rows <= 10 else (6 if 10 < self.rows < 15 else 5)
         ax.annotate(
             str(level),
-            xy=(badge_center_x+1, badge_center_y+1),
-            color='white',
-            ha='center',
-            va='center',
+            xy=(badge_center_x + 1, badge_center_y + 1),
+            color="white",
+            ha="center",
+            va="center",
             zorder=10,
-            fontsize= 10 if self.rows<10 else 6,
-            weight='bold'
+            fontsize=fontsize,
+            weight="bold",
         )

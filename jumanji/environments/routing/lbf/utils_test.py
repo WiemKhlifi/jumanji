@@ -19,12 +19,12 @@ import jax.numpy as jnp
 from jumanji.environments.routing.lbf.constants import DOWN, LEFT, RIGHT, UP
 from jumanji.environments.routing.lbf.types import Agent, Food
 from jumanji.environments.routing.lbf.utils import (
+    are_entities_adjacent,
     eat,
     fix_collisions,
-    is_adj,
-    move,
     place_agent_on_grid,
     place_food_on_grid,
+    simulate_agent_movement,
     slice_around,
 )
 
@@ -60,35 +60,37 @@ def test_move(agent1: Agent, agents: Agent, food: Food) -> None:
     # But there is a food at [1, 1] so it cannot move there.
     grid_size = 3
     # Move agent 1 to [0, 2]
-    agent1_new = move(agent1, RIGHT, food, agents, grid_size)
+    agent1_new = simulate_agent_movement(agent1, RIGHT, food, agents, grid_size)
     assert jnp.all(agent1_new.position == jnp.array([0, 2]))
 
     # Try move agent 1 into agent 0.
-    agent1_new = move(agent1, LEFT, food, agents, grid_size)
+    agent1_new = simulate_agent_movement(agent1, LEFT, food, agents, grid_size)
     assert jnp.all(agent1_new.position == agent1.position)
 
     # Try move agent 1 into food 0.
-    agent1_new = move(agent1, DOWN, food, agents, grid_size)
+    agent1_new = simulate_agent_movement(agent1, DOWN, food, agents, grid_size)
     assert jnp.all(agent1_new.position == agent1.position)
 
     # Try move agent 1 out of bounds.
-    agent1_new = move(agent1, UP, food, agents, grid_size)
+    agent1_new = simulate_agent_movement(agent1, UP, food, agents, grid_size)
     assert jnp.all(agent1_new.position == agent1.position)
 
 
-def test_is_adj(
+def test_are_entities_adjacent(
     agents: Agent, agent0: Agent, agent1: Agent, agent2: Agent, agent3: Agent
 ) -> None:
-    assert is_adj(agent0, agent1)
-    assert is_adj(agent0, agent2)
-    assert not is_adj(agent0, agent3)
-    assert not is_adj(agent1, agent3)
-    assert not is_adj(agent2, agent3)
-    assert not is_adj(agent1, agent2)
+    assert are_entities_adjacent(agent0, agent1)
+    assert are_entities_adjacent(agent0, agent2)
+    assert not are_entities_adjacent(agent0, agent3)
+    assert not are_entities_adjacent(agent1, agent3)
+    assert not are_entities_adjacent(agent2, agent3)
+    assert not are_entities_adjacent(agent1, agent2)
 
-    # check that vmap also works with is_adj
+    # check that vmap also works with are_entities_adjacent
     expected_adj = jnp.array([False, True, True, False])
-    assert jnp.all(jax.vmap(is_adj, (0, None))(agents, agent0) == expected_adj)
+    assert jnp.all(
+        jax.vmap(are_entities_adjacent, (0, None))(agents, agent0) == expected_adj
+    )
 
 
 def test_eat(agents: Agent, food0: Food, food1: Food) -> None:

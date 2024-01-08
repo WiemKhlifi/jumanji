@@ -23,7 +23,7 @@ from numpy.typing import NDArray
 import jumanji.environments.routing.lbf.utils as utils
 from jumanji import specs
 from jumanji.env import Environment
-from jumanji.environments.routing.lbf.constants import LOAD, MOVES
+from jumanji.environments.routing.lbf.constants import MOVES
 from jumanji.environments.routing.lbf.generator import Generator, RandomGenerator
 from jumanji.environments.routing.lbf.observer import GridObserver, VectorObserver
 from jumanji.environments.routing.lbf.types import Food, Observation, State
@@ -230,20 +230,9 @@ class LevelBasedForaging(Environment[State]):
             `TimeStep` object corresponding the timestep returned by the environment.
         """
         # Move agents, fix collisions that may happen and set loading status.
-        moved_agents = jax.vmap(utils.move, (0, 0, None, None, None))(
-            state.agents,
-            actions,
-            state.food_items,
-            state.agents,
-            self._grid_size,
+        moved_agents = utils.update_agent_positions(
+            state.agents, actions, state.food_items, self._grid_size
         )
-        # check that no two agent share the same position after moving.
-        moved_agents = utils.fix_collisions(moved_agents, state.agents)
-
-        # set agent's loading status
-        moved_agents = jax.vmap(
-            lambda agent, action: agent.replace(loading=action == LOAD)
-        )(moved_agents, actions)
 
         # eat food
         food_items, eaten_this_step, adj_loading_level = jax.vmap(utils.eat, (None, 0))(
@@ -258,8 +247,8 @@ class LevelBasedForaging(Environment[State]):
             step_count=state.step_count + 1,
             key=state.key,
         )
-
         observation = self._observer.state_to_observation(state)
+
         # First condition is truncation, second is termination.
         terminate = jnp.all(state.food_items.eaten)
         truncate = state.step_count >= self.time_limit
