@@ -13,9 +13,10 @@
 # limitations under the License.
 
 import jax.numpy as jnp
+import pytest
 
 from jumanji.environments.routing.lbf.observer import GridObserver, VectorObserver
-from jumanji.environments.routing.lbf.types import Food, State
+from jumanji.environments.routing.lbf.types import Agent, Food, State
 
 # Levels:
 # agent grid
@@ -212,3 +213,92 @@ def test_vector_observer(state: State) -> None:
 
 
 # TODO: add test for the "2s" case.
+
+
+# Define constants for tests
+FOV = 5
+GRID_SIZE = 10
+NUM_AGENTS = 3
+NUM_FOOD = 5
+MAX_AGENT_LEVEL = 10
+MAX_FOOD_LEVEL = 5
+TIME_LIMIT = 100
+
+# Define helper functions to create test entities
+def create_agent(id, position, level):
+    return Agent(id=id, position=position, level=level)
+
+
+def create_food(position, level, eaten):
+    return Food(position=position, level=level, eaten=eaten)
+
+
+def create_state(agents, food_items, step_count):
+    return State(agents=agents, food_items=food_items, step_count=step_count)
+
+
+@pytest.mark.parametrize(
+    "agent_id, agent_position, agent_level, food_positions, food_levels, food_eaten, expected_observation",
+    [
+        # Test ID: 1 - Happy path test with single agent and single food
+        (
+            0,
+            (2, 2),
+            1,
+            [(2, 3)],
+            [3],
+            [False],
+            jnp.array([2, 3, 3, 2, 2, 1, -1, -1, 0, -1, -1, 0, -1, -1, 0]),
+        ),
+        # Test ID: 2 - Edge case with agent at the edge of the grid
+        (
+            0,
+            (0, 0),
+            1,
+            [(0, 1)],
+            [3],
+            [False],
+            jnp.array([0, 1, 3, 0, 0, 1, -1, -1, 0, -1, -1, 0, -1, -1, 0]),
+        ),
+        # Test ID: 3 - Error case with food out of bounds (should be handled gracefully)
+        (
+            0,
+            (2, 2),
+            1,
+            [(GRID_SIZE + 1, GRID_SIZE + 1)],
+            [3],
+            [False],
+            jnp.array([-1, -1, 0, 2, 2, 1, -1, -1, 0, -1, -1, 0, -1, -1, 0]),
+        ),
+        # Additional test cases should be added here for 100% coverage
+    ],
+    ids=["happy-single-agent-food", "edge-agent-edge-grid", "error-food-out-of-bounds"],
+)
+def test_make_observation(
+    agent_id,
+    agent_position,
+    agent_level,
+    food_positions,
+    food_levels,
+    food_eaten,
+    expected_observation,
+):
+    # Arrange
+    observer = VectorObserver(
+        fov=FOV, grid_size=GRID_SIZE, num_agents=NUM_AGENTS, num_food=NUM_FOOD
+    )
+    agent = create_agent(agent_id, agent_position, agent_level)
+    food_items = [
+        create_food(pos, level, eaten)
+        for pos, level, eaten in zip(food_positions, food_levels, food_eaten)
+    ]
+    state = create_state(agents=[agent], food_items=food_items, step_count=0)
+
+    # Act
+    observation = observer.make_observation(agent, state)
+
+    # Assert
+    chex.assert_equal(observation, expected_observation)
+
+
+# Additional tests for other methods like transform_positions, extract_foods_info, extract_agents_info, compute_action_mask, state_to_observation, and observation_spec should be added following the same pattern.

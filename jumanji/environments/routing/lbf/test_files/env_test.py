@@ -21,16 +21,18 @@ from jumanji.environments.routing.lbf.types import Agent, Food, State
 from jumanji.testing.env_not_smoke import check_env_does_not_smoke
 from jumanji.types import StepType
 
+# TODO: test _get_extra_info
+
 
 def test_get_reward(
-    level_based_foraging_env: LevelBasedForaging, agents: Agent, food: Food
+    lbf_env_vector_obs: LevelBasedForaging, agents: Agent, food: Food
 ) -> None:
     adj_food0_level = jnp.array([0.0, agents.level[1], agents.level[2], 0.0])
     adj_food1_level = jnp.array([0.0, 0.0, agents.level[2], 0.0])
     adj_agent_levels = jnp.array([adj_food0_level, adj_food1_level])
     eaten = jnp.array([True, False])
 
-    reward = level_based_foraging_env.get_reward(food, adj_agent_levels, eaten)
+    reward = lbf_env_vector_obs.get_reward(food, adj_agent_levels, eaten)
 
     expected_reward = (adj_food0_level * food.level[0]) / (
         jnp.sum(food.level) * jnp.sum(adj_food0_level)
@@ -40,7 +42,7 @@ def test_get_reward(
 
 
 def test__reward_per_food(
-    level_based_foraging_env: LevelBasedForaging,
+    lbf_env_vector_obs: LevelBasedForaging,
     agents: Agent,
     food0: Food,
     food1: Food,
@@ -68,18 +70,18 @@ def test__reward_per_food(
 
     # check that reward is 0 if food is not eaten
     # food 0
-    reward_not_eaten = level_based_foraging_env._reward_per_food(
+    reward_not_eaten = lbf_env_vector_obs._reward_per_food(
         food0, adj_food0_level, jnp.asarray(False), tot_food_level
     )
     assert jnp.all(reward_not_eaten == 0.0)
     # food 1
-    reward_not_eaten = level_based_foraging_env._reward_per_food(
+    reward_not_eaten = lbf_env_vector_obs._reward_per_food(
         food1, adj_food1_level, jnp.asarray(False), tot_food_level
     )
     assert jnp.all(reward_not_eaten == 0.0)
 
     # check that correct reward received for food0 when eaten
-    reward_eaten = level_based_foraging_env._reward_per_food(
+    reward_eaten = lbf_env_vector_obs._reward_per_food(
         food0, adj_food0_level, jnp.asarray(True), tot_food_level
     )
     assert jnp.all(
@@ -88,7 +90,7 @@ def test__reward_per_food(
     )
 
     # check that correct reward received for food1 when eaten
-    reward_eaten = level_based_foraging_env._reward_per_food(
+    reward_eaten = lbf_env_vector_obs._reward_per_food(
         food1, adj_food1_level, jnp.asarray(True), tot_food_level
     )
     assert jnp.all(
@@ -97,15 +99,13 @@ def test__reward_per_food(
     )
 
 
-def test_reset(level_based_foraging_env: LevelBasedForaging, key: chex.PRNGKey) -> None:
-    num_agents = level_based_foraging_env._generator.num_agents
-    grid_size = level_based_foraging_env._generator.grid_size
+def test_reset(lbf_env_vector_obs: LevelBasedForaging, key: chex.PRNGKey) -> None:
+    num_agents = lbf_env_vector_obs._generator.num_agents
+    grid_size = lbf_env_vector_obs._generator.grid_size
 
-    state, timestep = level_based_foraging_env.reset(key)
+    state, timestep = lbf_env_vector_obs.reset(key)
     assert len(state.agents.position) == num_agents
-    assert (
-        len(state.food_items.position) == level_based_foraging_env._generator.num_food
-    )
+    assert len(state.food_items.position) == lbf_env_vector_obs._generator.num_food
 
     expected_obs_shape = (num_agents, 3, grid_size, grid_size)
     assert timestep.observation.agents_view.shape == expected_obs_shape
@@ -118,7 +118,7 @@ def test_reset(level_based_foraging_env: LevelBasedForaging, key: chex.PRNGKey) 
     assert timestep.reward.shape == (num_agents,)
 
 
-def test_step(level_based_foraging_env: LevelBasedForaging, state: State) -> None:
+def test_step(lbf_env_vector_obs: LevelBasedForaging, state: State) -> None:
     # agent grid
     # [a0, a1, 0],
     # [a2, 0, a3],
@@ -129,12 +129,12 @@ def test_step(level_based_foraging_env: LevelBasedForaging, state: State) -> Non
     # [0, f0, 0],
     # [f1, 0, 0],
 
-    num_agents = level_based_foraging_env._generator.num_agents
+    num_agents = lbf_env_vector_obs._generator.num_agents
     food = state.food_items
 
     # tranisition where everyone does a no-op
     action = jnp.array([NOOP] * num_agents)
-    next_state, timestep = level_based_foraging_env.step(state, action)
+    next_state, timestep = lbf_env_vector_obs.step(state, action)
 
     assert jnp.all(timestep.discount == 1.0)
     assert jnp.all(timestep.reward == 0.0)
@@ -150,7 +150,7 @@ def test_step(level_based_foraging_env: LevelBasedForaging, state: State) -> Non
     # transition where all agents load food
     # middle food was eaten
     action = jnp.array([LOAD] * num_agents)
-    next_state, next_timestep = level_based_foraging_env.step(state, action)
+    next_state, next_timestep = lbf_env_vector_obs.step(state, action)
     assert jnp.all(next_timestep.discount == 1.0)
     # check reward is correct
     adj_levels = next_state.agents.level[jnp.array([1, 2, 3])]
@@ -174,7 +174,7 @@ def test_step(level_based_foraging_env: LevelBasedForaging, state: State) -> Non
     # Test agents moving
     # Only agents 1, 2 and 3 have space to move
     action = jnp.array([NOOP, RIGHT, RIGHT, DOWN])
-    next_state_1, next_timestep_1 = level_based_foraging_env.step(next_state, action)
+    next_state_1, next_timestep_1 = lbf_env_vector_obs.step(next_state, action)
     assert jnp.all(next_timestep_1.discount == 1.0)
     assert jnp.all(next_timestep_1.reward == 0.0)
     assert next_timestep_1.discount.shape == (num_agents,)
@@ -186,11 +186,11 @@ def test_step(level_based_foraging_env: LevelBasedForaging, state: State) -> Non
 
 
 def test_step_done_horizon(
-    level_based_foraging_env: LevelBasedForaging, key: chex.PRNGKey
+    lbf_env_vector_obs: LevelBasedForaging, key: chex.PRNGKey
 ) -> None:
-    num_agents = level_based_foraging_env._generator.num_agents
+    num_agents = lbf_env_vector_obs._generator.num_agents
     # test done after 5 steps
-    state, timestep = level_based_foraging_env.reset(key)
+    state, timestep = lbf_env_vector_obs.reset(key)
     assert timestep.step_type == StepType.FIRST
     assert state.step_count == 0
     assert jnp.all(timestep.discount == 1.0)
@@ -198,7 +198,7 @@ def test_step_done_horizon(
     assert timestep.reward.shape == (num_agents,)
 
     action = jnp.array([NOOP] * num_agents)
-    state, timestep = level_based_foraging_env.step(state, action)
+    state, timestep = lbf_env_vector_obs.step(state, action)
 
     for i in range(1, 5):
         assert timestep.step_type == StepType.MID
@@ -207,7 +207,7 @@ def test_step_done_horizon(
         assert timestep.discount.shape == (num_agents,)
         assert timestep.reward.shape == (num_agents,)
 
-        state, timestep = level_based_foraging_env.step(state, action)
+        state, timestep = lbf_env_vector_obs.step(state, action)
 
     assert timestep.step_type == StepType.LAST
     assert state.step_count == 5
@@ -217,20 +217,20 @@ def test_step_done_horizon(
 
 
 def test_step_done_all_eaten(
-    level_based_foraging_env: LevelBasedForaging,
+    lbf_env_vector_obs: LevelBasedForaging,
     agents: Agent,
     food_items: Food,
     key: chex.PRNGKey,
 ) -> None:
-    num_agents = level_based_foraging_env._generator.num_agents
-    num_food = level_based_foraging_env._generator.num_food
+    num_agents = lbf_env_vector_obs._generator.num_agents
+    num_food = lbf_env_vector_obs._generator.num_food
 
     # set agent 2's level high enough to eat food 1
     agents.level = agents.level.at[2].set(5)
 
     state = State(step_count=0, agents=agents, food_items=food_items, key=key)
     action = jnp.array([LOAD] * num_agents)
-    state, timestep = level_based_foraging_env.step(state, action)
+    state, timestep = lbf_env_vector_obs.step(state, action)
 
     assert timestep.step_type == StepType.LAST
     assert jnp.all(timestep.discount == 0.0)
@@ -281,5 +281,5 @@ def test_step_done_all_eaten(
     assert jnp.sum(timestep.reward) == 1
 
 
-def test_env_does_not_smoke(level_based_foraging_env: LevelBasedForaging) -> None:
-    check_env_does_not_smoke(level_based_foraging_env)
+def test_env_does_not_smoke(lbf_env_vector_obs: LevelBasedForaging) -> None:
+    check_env_does_not_smoke(lbf_env_vector_obs)

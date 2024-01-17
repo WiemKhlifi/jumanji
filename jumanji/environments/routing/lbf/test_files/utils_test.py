@@ -16,26 +16,19 @@ import chex
 import jax
 import jax.numpy as jnp
 
+import jumanji.environments.routing.lbf.constants as constants
+import jumanji.environments.routing.lbf.utils as utils
 from jumanji.environments.routing.lbf.constants import DOWN, LEFT, RIGHT, UP
 from jumanji.environments.routing.lbf.types import Agent, Food
-from jumanji.environments.routing.lbf.utils import (
-    are_entities_adjacent,
-    eat,
-    fix_collisions,
-    place_agent_on_grid,
-    place_food_on_grid,
-    simulate_agent_movement,
-    slice_around,
-)
 
 
 def test_place_agent_on_grid(agent1: Agent, agents: Agent) -> None:
     grid = jnp.zeros((3, 3))
 
     expected_agent_1_grid = jnp.array([[0, agent1.level, 0], [0, 0, 0], [0, 0, 0]])
-    assert jnp.all(place_agent_on_grid(agent1, grid) == expected_agent_1_grid)
+    assert jnp.all(utils.place_agent_on_grid(agent1, grid) == expected_agent_1_grid)
 
-    agent_grids = jax.vmap(place_agent_on_grid, (0, None))(agents, grid)
+    agent_grids = jax.vmap(utils.place_agent_on_grid, (0, None))(agents, grid)
     expected_grids = jnp.array(
         [
             [[1, 0, 0], [0, 0, 0], [0, 0, 0]],
@@ -51,67 +44,69 @@ def test_place_food_on_grid(food: Food) -> None:
     grid = jnp.zeros((3, 3))
 
     expected_food_grid = jnp.array([[0, 0, 0], [0, 4, 0], [3, 0, 0]])
-    food_grid = jnp.sum(jax.vmap(place_food_on_grid, (0, None))(food, grid), axis=0)
+    food_grid = jnp.sum(
+        jax.vmap(utils.place_food_on_grid, (0, None))(food, grid), axis=0
+    )
     assert jnp.all(food_grid == expected_food_grid)
 
 
-def test_move(agent1: Agent, agents: Agent, food: Food) -> None:
+def test_simulate_agent_movement(agent1: Agent, agents: Agent, food: Food) -> None:
     # Agent 1 is at [0, 1] and can move to [0, 0] or [0, 2].
     # But there is a food at [1, 1] so it cannot move there.
     grid_size = 3
     # Move agent 1 to [0, 2]
-    agent1_new = simulate_agent_movement(agent1, RIGHT, food, agents, grid_size)
+    agent1_new = utils.simulate_agent_movement(agent1, RIGHT, food, agents, grid_size)
     assert jnp.all(agent1_new.position == jnp.array([0, 2]))
 
     # Try move agent 1 into agent 0.
-    agent1_new = simulate_agent_movement(agent1, LEFT, food, agents, grid_size)
+    agent1_new = utils.simulate_agent_movement(agent1, LEFT, food, agents, grid_size)
     assert jnp.all(agent1_new.position == agent1.position)
 
     # Try move agent 1 into food 0.
-    agent1_new = simulate_agent_movement(agent1, DOWN, food, agents, grid_size)
+    agent1_new = utils.simulate_agent_movement(agent1, DOWN, food, agents, grid_size)
     assert jnp.all(agent1_new.position == agent1.position)
 
     # Try move agent 1 out of bounds.
-    agent1_new = simulate_agent_movement(agent1, UP, food, agents, grid_size)
+    agent1_new = utils.simulate_agent_movement(agent1, UP, food, agents, grid_size)
     assert jnp.all(agent1_new.position == agent1.position)
 
 
 def test_are_entities_adjacent(
     agents: Agent, agent0: Agent, agent1: Agent, agent2: Agent, agent3: Agent
 ) -> None:
-    assert are_entities_adjacent(agent0, agent1)
-    assert are_entities_adjacent(agent0, agent2)
-    assert not are_entities_adjacent(agent0, agent3)
-    assert not are_entities_adjacent(agent1, agent3)
-    assert not are_entities_adjacent(agent2, agent3)
-    assert not are_entities_adjacent(agent1, agent2)
+    assert utils.are_entities_adjacent(agent0, agent1)
+    assert utils.are_entities_adjacent(agent0, agent2)
+    assert not utils.are_entities_adjacent(agent0, agent3)
+    assert not utils.are_entities_adjacent(agent1, agent3)
+    assert not utils.are_entities_adjacent(agent2, agent3)
+    assert not utils.are_entities_adjacent(agent1, agent2)
 
     # check that vmap also works with are_entities_adjacent
     expected_adj = jnp.array([False, True, True, False])
     assert jnp.all(
-        jax.vmap(are_entities_adjacent, (0, None))(agents, agent0) == expected_adj
+        jax.vmap(utils.are_entities_adjacent, (0, None))(agents, agent0) == expected_adj
     )
 
 
-def test_eat(agents: Agent, food0: Food, food1: Food) -> None:
+def test_eat_food(agents: Agent, food0: Food, food1: Food) -> None:
     # food 0 can be eaten, food 1 has too high a level for adj agents.
     # set all agent actions to loading
     all_loading_agents = jax.vmap(lambda agent: agent.replace(loading=True))(agents)
 
     # check that food 0 can be eaten
-    new_food0, eaten_food0, adj_agents = eat(all_loading_agents, food0)
+    new_food0, eaten_food0, adj_agents = utils.eat_food(all_loading_agents, food0)
     assert new_food0.eaten
     assert eaten_food0
     assert jnp.all(adj_agents == agents.level * jnp.array([0, 1, 1, 1]))
 
     # check that food 1 cannot be eaten
-    new_food1, eaten_food1, adj_agents = eat(all_loading_agents, food1)
+    new_food1, eaten_food1, adj_agents = utils.eat_food(all_loading_agents, food1)
     assert not new_food1.eaten
     assert not eaten_food1
     assert jnp.all(adj_agents == agents.level * jnp.array([0, 0, 1, 0]))
 
     # check that if food is already eaten, it cannot be eaten again
-    new_food0, eaten_food0, adj_agents = eat(all_loading_agents, new_food0)
+    new_food0, eaten_food0, adj_agents = utils.eat_food(all_loading_agents, new_food0)
     assert new_food0.eaten
     assert not eaten_food0
     assert jnp.all(adj_agents == agents.level * jnp.array([0, 1, 1, 1]))
@@ -140,7 +135,7 @@ def test_fix_collisions(agents: Agent) -> None:
         position=jnp.array([[0, 0], [0, 1], [2, 0], [1, 2]]),
     )
 
-    new_agents = fix_collisions(moved_agents, agents)
+    new_agents = utils.fix_collisions(moved_agents, agents)
     chex.assert_trees_all_equal(new_agents, expected_agents)
 
 
@@ -161,7 +156,7 @@ def test_slice_around() -> None:
     )
 
     # slice around pos
-    slice_coords = slice_around(pos, fov)
+    slice_coords = utils.slice_around(pos, fov)
     view = jax.lax.dynamic_slice(grid, slice_coords, (2 * fov + 1, 2 * fov + 1))
 
     assert jnp.all(view == expected_slice)
@@ -178,6 +173,6 @@ def test_slice_around() -> None:
         ]
     )
 
-    slice_coords = slice_around(pos, fov)
+    slice_coords = utils.slice_around(pos, fov)
     view = jax.lax.dynamic_slice(grid, slice_coords, (2 * fov + 1, 2 * fov + 1))
     assert jnp.all(view == expected_slice)

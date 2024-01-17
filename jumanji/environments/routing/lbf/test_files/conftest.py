@@ -19,8 +19,6 @@ import pytest
 
 from jumanji.environments.routing.lbf.env import LevelBasedForaging
 from jumanji.environments.routing.lbf.generator import RandomGenerator
-
-# from jumanji.environments.routing.lbf.observer import GridObserver
 from jumanji.environments.routing.lbf.types import Agent, Food, State
 from jumanji.tree_utils import tree_transpose
 
@@ -133,7 +131,7 @@ def food_grid() -> chex.Array:
 
 
 @pytest.fixture
-def level_based_foraging_env() -> LevelBasedForaging:
+def lbf_env_vector_obs() -> LevelBasedForaging:
     generator = RandomGenerator(
         grid_size=8,
         fov=8,
@@ -142,6 +140,43 @@ def level_based_foraging_env() -> LevelBasedForaging:
         max_agent_level=2,
         force_coop=False,
     )
-    # observer = GridObserver(fov=1, grid_size=3)
+    return LevelBasedForaging(generator=generator, time_limit=10)
 
-    return LevelBasedForaging(generator=generator, grid_observation=True, time_limit=5)
+
+@pytest.fixture
+def lbf_env_grid_obs() -> LevelBasedForaging:
+    generator = RandomGenerator(
+        grid_size=8,
+        fov=8,
+        num_agents=4,
+        num_food=2,
+        max_agent_level=2,
+        force_coop=False,
+    )
+    return LevelBasedForaging(generator=generator, grid_observation=True, time_limit=10)
+
+
+@pytest.fixture
+def lbf_env_default_penalty() -> LevelBasedForaging:
+    generator = RandomGenerator(
+        grid_size=8,
+        fov=8,
+        num_agents=4,
+        num_food=2,
+        max_agent_level=2,
+        force_coop=False,
+    )
+    return LevelBasedForaging(generator=generator, grid_observation=False, penalty=1.0)
+
+
+@pytest.fixture
+def lbf_env_default_no_norm_reward() -> LevelBasedForaging:
+    generator = RandomGenerator(
+        grid_size=8,
+        fov=8,
+        num_agents=4,
+        num_food=2,
+        max_agent_level=2,
+        force_coop=False,
+    )
+    return LevelBasedForaging(generator=generator, normalize_reward=False)

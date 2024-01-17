@@ -56,6 +56,7 @@ from jumanji.training.loggers import (
     TerminalLogger,
 )
 from jumanji.training.networks.actor_critic import ActorCriticNetworks
+from jumanji.training.networks.lbf.lbf_wrapper import LbfWrapper
 from jumanji.training.networks.protocols import RandomPolicy
 from jumanji.training.types import ActingState, TrainingState
 from jumanji.wrappers import VmapAutoResetWrapper
@@ -89,7 +90,11 @@ def setup_logger(cfg: DictConfig) -> Logger:
 
 
 def _make_raw_env(cfg: DictConfig) -> Environment:
-    return jumanji.make(cfg.env.registered_version)
+    env = jumanji.make(cfg.env.registered_version)
+    if cfg.env.name == "lbf":
+        # Apply wrapper on lbf env
+        env = LbfWrapper(env)
+    return env
 
 
 def setup_env(cfg: DictConfig) -> Environment:

@@ -17,6 +17,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from IPython.display import Image
 
+import jumanji.environments.routing.lbf.utils as utils
 from jumanji.environments import LevelBasedForaging
 from jumanji.environments.routing.lbf.generator import RandomGenerator
 
@@ -25,7 +26,7 @@ key = jax.random.key(0)
 
 generator = RandomGenerator(
     grid_size=8,
-    fov=8,
+    fov=2,
     num_agents=3,
     num_food=2,
     max_agent_level=2,
@@ -36,20 +37,27 @@ generator = RandomGenerator(
 
 env = LevelBasedForaging(generator=generator)
 
-state1, timestep1 = jax.jit(env.reset)(key)
+for _ in range(1):
+    state1, timestep1 = jax.jit(env.reset)(key)
+    state1.agents.level = jnp.array([1, 2, 3])
+    state1.food_items.level = jnp.array([7, 3])
+    state1.agents.position = jnp.array([[5, 0], [4, 1], [5, 2]])
+    # env.render(state1)
 
-state1.agents.level = jnp.array([1, 2, 3])
-env.render(state1)
-plt.savefig("jumanji/environments/routing/lbf/state.png")
-action = jnp.array([1, 2, 3])
-# state1.food_items.eaten = jnp.array([True, False])
+    actions = jnp.array([5, 5, 5])
+    state2, timestep2 = env.step(state1, actions)
+    # env.render(state2)
+    # key, subkey = jax.random.split(key)
 
-state2, timestep2 = env.step(state1, action)
-key, subkey = jax.random.split(key)
+# * state1.food_items.position
+# * Array([[2, 5],
+# *       [5, 1]], dtype=int32)
 
-env.animate(
-    states=[state1, state2],
-    interval=100,
-    save_path="jumanji/environments/routing/lbf/lbf.gif",
-)
-Image(filename="jumanji/environments/routing/lbf/lbf.gif", embed=True)
+# plt.savefig("jumanji/environments/routing/lbf/state.png")
+
+# env.animate(
+#     states=[state1, state2],
+#     interval=100,
+#     save_path="jumanji/environments/routing/lbf/lbf.gif",
+# )
+# Image(filename="jumanji/environments/routing/lbf/lbf.gif", embed=True)

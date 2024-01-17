@@ -22,7 +22,6 @@ from jax import numpy as jnp
 from jumanji.environments.routing.lbf.types import Agent, Food, State
 
 
-# TODO: do we need this base class, there is only one viable generator to match lbf?
 class Generator(abc.ABC):
     """Base class for generators for the LBF environment."""
 
@@ -31,7 +30,7 @@ class Generator(abc.ABC):
         grid_size: int,
         fov: int,
         num_agents: int,
-        num_food: int,        
+        num_food: int,
         max_agent_level: int,
         force_coop: bool,
     ) -> None:
@@ -50,16 +49,18 @@ class Generator(abc.ABC):
         assert 2 <= fov <= grid_size, "Field of view must be between 2 and grid_size."
         assert 2 <= num_agents < 20, "Number of agents must be between 1 and 19."
         assert 1 <= num_food < 10, "Number of food items must be between 1 and 10."
-        assert max_agent_level >= 2, "Maximum agent level must be equal or greater to 2."
+        assert (
+            max_agent_level >= 2
+        ), "Maximum agent level must be equal or greater to 2."
 
         if fov is None:
             fov = grid_size
-        self.grid_size = grid_size
-        self.fov = fov
-        self.num_agents = num_agents
-        self.num_food = num_food
-        self.max_agent_level = max_agent_level
-        self.force_coop = force_coop
+        self._grid_size = grid_size
+        self._fov = fov
+        self._num_agents = num_agents
+        self._num_food = num_food
+        self._max_agent_level = max_agent_level
+        self._force_coop = force_coop
 
     @abc.abstractmethod
     def __call__(self, key: chex.PRNGKey) -> State:
@@ -68,6 +69,30 @@ class Generator(abc.ABC):
         Returns:
             A `LBF` state.
         """
+
+    @property
+    def grid_size(self) -> int:
+        return self._grid_size
+
+    @property
+    def fov(self) -> int:
+        return self._fov
+
+    @property
+    def num_agents(self) -> int:
+        return self._num_agents
+
+    @property
+    def num_food(self) -> int:
+        return self._num_food
+
+    @property
+    def max_agent_level(self) -> int:
+        return self._max_agent_level
+
+    @property
+    def force_coop(self) -> int:
+        return self._force_coop
 
 
 class RandomGenerator(Generator):
@@ -90,9 +115,12 @@ class RandomGenerator(Generator):
         """Initialises an lbf generator, used to generate grids for
         the LevelBasedForaging environment."""
         super().__init__(
-            grid_size=grid_size, fov=fov, num_agents=num_agents, 
-            num_food=num_food, max_agent_level=max_agent_level, 
-            force_coop=force_coop
+            grid_size=grid_size,
+            fov=fov,
+            num_agents=num_agents,
+            num_food=num_food,
+            max_agent_level=max_agent_level,
+            force_coop=force_coop,
         )
 
     def sample_food(self, key: chex.PRNGKey) -> chex.Array:
@@ -106,17 +134,17 @@ class RandomGenerator(Generator):
             chex.Array: An array containing the flat indices of food on the grid.
                         Each element corresponds to the flattened position of a food item.
         """
-        flat_size = self.grid_size**2
-        pos_keys = jax.random.split(key, self.num_food)
+        flat_size = self._grid_size**2
+        pos_keys = jax.random.split(key, self._num_food)
 
         # Create a mask to exclude edges
         mask = jnp.ones(flat_size, dtype=bool)
-        mask = mask.at[jnp.arange(self.grid_size)].set(False)  # top
-        mask = mask.at[jnp.arange(flat_size - self.grid_size, flat_size)].set(
+        mask = mask.at[jnp.arange(self._grid_size)].set(False)  # top
+        mask = mask.at[jnp.arange(flat_size - self._grid_size, flat_size)].set(
             False
         )  # bottom
-        mask = mask.at[jnp.arange(0, flat_size, self.grid_size)].set(False)  # left
-        mask = mask.at[jnp.arange(self.grid_size - 1, flat_size, self.grid_size)].set(
+        mask = mask.at[jnp.arange(0, flat_size, self._grid_size)].set(False)  # left
+        mask = mask.at[jnp.arange(self._grid_size - 1, flat_size, self._grid_size)].set(
             False
         )  # right
 
@@ -131,8 +159,8 @@ class RandomGenerator(Generator):
                     food_flat_pos,
                     food_flat_pos + 1,  # right
                     food_flat_pos - 1,  # left
-                    food_flat_pos + self.grid_size,  # up
-                    food_flat_pos - self.grid_size,  # down
+                    food_flat_pos + self._grid_size,  # up
+                    food_flat_pos - self._grid_size,  # down
                 ]
             )
 
@@ -142,7 +170,7 @@ class RandomGenerator(Generator):
 
         # Unravel indices to get the 2D coordinates (x, y)
         food_positions_x, food_positions_y = jnp.unravel_index(
-            food_flat_positions, (self.grid_size, self.grid_size)
+            food_flat_positions, (self._grid_size, self._grid_size)
         )
         food_positions = jnp.stack([food_positions_x, food_positions_y], axis=1)
 
@@ -162,20 +190,18 @@ class RandomGenerator(Generator):
         """
         agent_flat_positions = jax.random.choice(
             key=key,
-            a=self.grid_size**2,
-            shape=(self.num_agents,),
+            a=self._grid_size**2,
+            shape=(self._num_agents,),
             replace=False,  # Avoid agent positions overlaping
             p=mask,
         )
         # Unravel indices to get x and y coordinates
         agent_positions_x, agent_positions_y = jnp.unravel_index(
-            agent_flat_positions, (self.grid_size, self.grid_size)
+            agent_flat_positions, (self._grid_size, self._grid_size)
         )
 
         # Stack x and y coordinates to form a 2D array
-        agent_positions = jnp.stack([agent_positions_x, agent_positions_y], axis=1)
-
-        return agent_positions
+        return jnp.stack([agent_positions_x, agent_positions_y], axis=1)
 
     def sample_levels(
         self, max_level: int, shape: chex.Shape, key: chex.PRNGKey
@@ -220,14 +246,14 @@ class RandomGenerator(Generator):
 
         # Generate positions for agents. The mask contains 0's where food is placed,
         # 1's where agents can be placed.
-        mask = jnp.ones((self.grid_size, self.grid_size), dtype=bool)
+        mask = jnp.ones((self._grid_size, self._grid_size), dtype=bool)
         mask = mask.at[food_positions].set(False)
         mask = mask.ravel()
         agent_positions = self.sample_agents(key=agent_pos_key, mask=mask)
 
         # Generate levels for agents and food items
         agent_levels = self.sample_levels(
-            self.max_agent_level, (self.num_agents,), agent_level_key
+            self._max_agent_level, (self._num_agents,), agent_level_key
         )
         max_food_level = jnp.sum(
             jnp.sort(agent_levels)[:3]
@@ -235,19 +261,19 @@ class RandomGenerator(Generator):
 
         # Determine food levels based on the maximum level of agents
         food_levels = jnp.where(
-            self.force_coop,
-            jnp.full(shape=(self.num_food,), fill_value=max_food_level),
-            self.sample_levels(max_food_level, (self.num_food,), food_level_key),
+            self._force_coop,
+            jnp.full(shape=(self._num_food,), fill_value=max_food_level),
+            self.sample_levels(max_food_level, (self._num_food,), food_level_key),
         )
 
         # Create pytrees for agents and food items
         agents = jax.vmap(Agent)(
-            id=jnp.arange(self.num_agents),
+            id=jnp.arange(self._num_agents),
             position=agent_positions,
             level=agent_levels,
         )
         food_items = jax.vmap(Food)(
-            id=jnp.arange(self.num_food),
+            id=jnp.arange(self._num_food),
             position=food_positions,
             level=food_levels,
         )

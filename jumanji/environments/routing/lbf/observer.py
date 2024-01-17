@@ -13,7 +13,7 @@
 # limitations under the License.
 
 import abc
-from typing import Tuple, Union
+from typing import Any, Tuple, Union
 
 import chex
 import jax
@@ -22,15 +22,23 @@ import jax.numpy as jnp
 from jumanji import specs
 from jumanji.environments.routing.lbf import utils
 from jumanji.environments.routing.lbf.constants import MOVES
-from jumanji.environments.routing.lbf.types import Agent, Food, Observation, State
+from jumanji.environments.routing.lbf.types import (
+    Agent,
+    Entity,
+    Food,
+    Observation,
+    State,
+)
 
 
 class LbfObserver(abc.ABC):
-    """The original LBF environment has two different observation types.
+    """
+    Base class for LBF environment observers.
 
+    The original LBF environment has two different observation types.
     This is a base class to allow for implementing both observation types.
     Original implementation: https://github.com/semitable/lb-foraging/blob/60939b921e8e9f8ab5affa33c4ad29e916b47d41/lbforaging/foraging/environment.py#L378
-    """  # noqa: E501
+    """
 
     def __init__(
         self, fov: int, grid_size: int, num_agents: int, num_food: int
@@ -96,18 +104,24 @@ class LbfObserver(abc.ABC):
 
 class VectorObserver(LbfObserver):
     """
-    An observer for the LBF environment that returns a vector observation.
+    An observer for the LBF environment that provides a vector observation.
 
-    This observation is the same observation used in the paper: Benchmarking Multi-Agent
-    Deep Reinforcement Learning Algorithms in Cooperative Tasks - Papoudakis et al.
+    The vector observation is designed based on the structure used in the paper:
+    "Benchmarking Multi-Agent Deep Reinforcement Learning Algorithms in Cooperative Tasks" - Papoudakis et al.
 
-    The observation is a vector of length 3 * num_food + 3 * num_agents + 1, for each agent.
-    The first 3 * num_food elements are the food positions and levels.
-    The next 3 elements are the current agent's position and level.
-    The final 3 * num_agents elements are the other agents' positions and levels.
+    The observation is a vector of length 3 * (num_food + num_agents) for each agent.
+    - The first 3 * num_food elements represent the positions and levels of food items.
+    - The next 3 elements indicate the current agent's position and level.
+    - The final 3 * (num_agents - 1) elements represent the positions and levels of other agents.
 
-    Foods and agents are represented as (y, x, level). If a food or agent is not in the
+    Foods and agents are represented as (y, x, level). If a food or agent is outside the
     agent's field of view, it is represented as (-1, -1, 0).
+
+    Parameters:
+    - fov (int): The field of view of the agents.
+    - grid_size (int): The size of the grid.
+    - num_agents (int): The number of agents in the environment.
+    - num_food (int): The number of food items in the environment.
     """
 
     def __init__(
@@ -130,10 +144,7 @@ class VectorObserver(LbfObserver):
         """
         min_x = jnp.minimum(self.fov, agent.position[0])
         min_y = jnp.minimum(self.fov, agent.position[1])
-        transformed_positions = (
-            items.position - agent.position + jnp.array([min_x, min_y])
-        )
-        return transformed_positions
+        return items.position - agent.position + jnp.array([min_x, min_y])
 
     def extract_foods_info(
         self, agent: Agent, visible_foods: chex.Array, all_foods: Food
@@ -211,9 +222,9 @@ class VectorObserver(LbfObserver):
 
         # Get action mask
         next_positions = agent.position + MOVES
-        check_pos_fn = lambda next_pos, entities, condition: jnp.any(
-            jnp.all(next_pos == entities.position, axis=-1) & condition
-        )
+
+        def check_pos_fn(next_pos: Any, entities: Entity, condition: bool) -> Any:
+            return jnp.any(jnp.all(next_pos == entities.position, axis=-1) & condition)
 
         # Check if any agent is in a next position (condition: The agent doesn't block itself)
         agent_occupied = jax.vmap(check_pos_fn, (0, None, None))(
@@ -333,6 +344,16 @@ class VectorObserver(LbfObserver):
         max_food_level: int,
         time_limit: int,
     ) -> specs.Spec[Observation]:
+        """Returns the observation spec for the environment.
+
+        Args:
+            max_agent_level (int): The maximum level of an agent.
+            max_food_level (int): The maximum level of a food.
+            time_limit (int): The time limit for the environment.
+
+        Returns:
+            specs.Spec[Observation]: The observation spec for the environment.
+        """
         max_ob = jnp.max(jnp.array([max_food_level, max_agent_level]))
         agents_view = specs.BoundedArray(
             shape=(self.num_agents, 3 * (self.num_agents + self.num_food)),
@@ -355,14 +376,17 @@ class GridObserver(LbfObserver):
     """
     An observer for the LBF environment that returns a grid observation.
 
-    This is a new observation where instead of a vector of absolute positions,
-    each agent's view is returned as a grid of shape (3, 2 * fov + 1, 2 * fov + 1).
-    Where the grid represents the environment around the agent split into 3 slices.
+    This observer provides a grid representation of the environment around each agent.
+    The grid is composed of three slices:
+    - Agent Slice: Represents the levels of agents.
+    - Food Slice: Represents the levels of food items.
+    - Access Slice: Indicates empty cells (1) and occupied cells (0).
 
-    The first slice is the agent slice, where all agent's levels are placed.
-    The second slice is the food slice, where all food's levels are placed.
-    The third slice is the access slice, where 1s represent empty cells and 0s represent
-    cells that are occupied by an agent or food.
+    Parameters:
+    - fov (int): The field of view of the agents.
+    - grid_size (int): The size of the grid.
+    - num_agents (int): The number of agents in the environment.
+    - num_food (int): The number of food items in the environment.
     """
 
     def __init__(
@@ -371,47 +395,50 @@ class GridObserver(LbfObserver):
         super().__init__(fov, grid_size, num_agents, num_food)
 
     def state_to_observation(self, state: State) -> Observation:
-        """Converts a `State` to an `Observation`.
+        """
+        Converts a `State` to a grid-based `Observation`.
 
         Args:
-            state (State): The current state of the environment, containing agents and foods info.
+            state (State): The current state of the environment, containing agent and food information.
 
         Returns:
-            Observation: An Observation containing the agents' views, action masks,
+            Observation: An Observation containing agents' views, action masks,
             and step count for all agents.
         """
-        # get grids with only agents and grid with only foods
+        # Generate grids with only agents and only foods
         grid = jnp.zeros((self.grid_size, self.grid_size), dtype=jnp.int32)
         agent_grids = jax.vmap(utils.place_agent_on_grid, (0, None))(state.agents, grid)
         food_grids = jax.vmap(utils.place_food_on_grid, (0, None))(
             state.food_items, grid
         )
-        # join all agents into 1 grid and all food into 1 grid
+
+        # Aggregate all agents into one grid and all food into one grid
         agent_grid = jnp.sum(agent_grids, axis=0)
         food_grid = jnp.sum(food_grids, axis=0)
 
-        # pad the grid so obs cannot go out of bounds
+        # Pad the grid to prevent out-of-bounds observation
         agent_grid = jnp.pad(agent_grid, self.fov, constant_values=-1)
         food_grid = jnp.pad(food_grid, self.fov, constant_values=-1)
 
-        # get the indexes to slice in the grid to obtain the view around the agent
+        # Get the indexes to slice the grid and obtain the view around the agent
         slice_len = 2 * self.fov + 1, 2 * self.fov + 1
         slice_xs, slice_ys = jax.vmap(utils.slice_around, (0, None))(
             state.agents.position, self.fov
         )
 
-        # slice agent and food grids to obtain the view around the agent
+        # Slice agent and food grids to obtain the view around the agent
         agents_view = jax.vmap(jax.lax.dynamic_slice, in_axes=(None, 0, None))(
             agent_grid, (slice_xs, slice_ys), slice_len
         )
         foods_view = jax.vmap(jax.lax.dynamic_slice, in_axes=(None, 0, None))(
             food_grid, (slice_xs, slice_ys), slice_len
         )
-        # compute access mask (action mask in the observation); noop is always available
+
+        # Compute access mask (action mask in the observation); noop is always available
         access_masks = (agents_view + foods_view) == 0
         access_masks = access_masks.at[:, self.fov, self.fov].set(True)
 
-        # compute action mask
+        # Compute action mask
         local_pos = jnp.array([self.fov, self.fov])
         next_local_pos = local_pos + MOVES
         action_mask = access_masks[:, next_local_pos.T[0], next_local_pos.T[1]]
@@ -431,8 +458,6 @@ class GridObserver(LbfObserver):
         """Returns the observation spec for the environment.
 
         Args:
-            num_agents (int): The number of agents in the environment.
-            num_food (int): The number of foods in the environment.
             max_agent_level (int): The maximum level of an agent.
             max_food_level (int): The maximum level of a food.
             time_limit (int): The time limit for the environment.

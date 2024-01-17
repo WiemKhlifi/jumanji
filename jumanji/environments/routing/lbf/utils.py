@@ -21,6 +21,7 @@ import jax.numpy as jnp
 from jumanji.environments.routing.lbf.constants import LOAD, MOVES
 from jumanji.environments.routing.lbf.types import Agent, Entity, Food
 
+
 def are_entities_adjacent(entity_a: Entity, entity_b: Entity) -> chex.Array:
     """
     Check if two entities are adjacent in the grid.
@@ -162,34 +163,37 @@ def fix_collisions(moved_agents: Agent, original_agents: Agent) -> Agent:
     return agents
 
 
-def eat(agents: Agent, food: Food) -> Tuple[Food, chex.Array, chex.Array]:
-    """Tries to eat food if possible.
+def eat_food(agents: Agent, food: Food) -> Tuple[Food, chex.Array, chex.Array]:
+    """Try to eat the provided food if possible.
 
     Args:
-        agents: all agents in the grid.
-        food: the food to try to eat.
+        agents(Agent): All agents in the grid.
+        food(Food): The food to attempt to eat.
 
-    Returns: (new_food: Food, eaten: bool, adjacent_loading_levels: chex.Array)
-        new_food: the food with the eaten flag set if it was eaten.
-        eaten: whether the food was eaten this step.
-        adjacent_loading_levels: the agents that were loading around the food.
+    Returns:
+        new_food (Food): Updated state of the food, indicating whether it was eaten.
+        food_eaten_this_step (chex.Array): A flag indicating whether the food was eaten at this step.
+        agents_loading_levels (chex.Array): An array indicating the levels of adjacent agents loading around the food.
     """
 
-    def get_adj_level(agent: Agent, food: Food) -> chex.Array:
+    def get_adjacent_levels(agent: Agent, food: Food) -> chex.Array:
         """Return the level of the agent if it is adjacent to the food, else 0."""
-        return jax.lax.select(are_entities_adjacent(agent, food), agent.level, 0)
+        return jax.lax.select(
+            are_entities_adjacent(agent, food) & agent.loading & ~food.eaten,
+            agent.level,
+            0,
+        )
 
-    # get the level of all adjacent agents, if an agent is not adjacent, it's level is 0
-    adjacent_levels = jax.vmap(get_adj_level, (0, None))(agents, food)
+    # Get the level of all adjacent agents that are trying to load the food
+    adj_loading_agents_levels = jax.vmap(get_adjacent_levels, (0, None))(agents, food)
 
-    # sum the levels of all adjacent agents that are loading
-    adjacent_loading_levels = jnp.where(agents.loading, adjacent_levels, 0)
-    adjacent_level = jnp.sum(adjacent_loading_levels)
+    # If the food has already been eaten or is not loaded, the sum will be equal to 0
+    food_eaten_this_step = jnp.sum(adj_loading_agents_levels) >= food.level
 
-    food_eaten_this_step = (adjacent_level >= food.level) & (~food.eaten)
-    # set food to eaten if it was eaten and if it was already eaten leave it as eaten
-    new_food = food.replace(eaten=food_eaten_this_step | food.eaten)  # type: ignore
-    return new_food, food_eaten_this_step, adjacent_loading_levels
+    # Set food to eaten if it was eaten.
+    new_food = food.replace(eaten=food_eaten_this_step | food.eaten)
+
+    return new_food, food_eaten_this_step, adj_loading_agents_levels
 
 
 def place_agent_on_grid(agent: Agent, grid: chex.Array) -> chex.Array:
