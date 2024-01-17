@@ -25,7 +25,7 @@ from jumanji.environments.routing.lbf.generator import RandomGenerator
 key = jax.random.key(0)
 
 generator = RandomGenerator(
-    grid_size=8,
+    grid_size=6,
     fov=2,
     num_agents=3,
     num_food=2,
@@ -33,25 +33,19 @@ generator = RandomGenerator(
     force_coop=False,
 )
 
-# generator(key)
-
-env = LevelBasedForaging(generator=generator)
+env = LevelBasedForaging(generator=generator, grid_observation=True)
 
 for _ in range(2):
     state1, timestep1 = jax.jit(env.reset)(key)
     state1.agents.level = jnp.array([1, 2, 3])
     state1.food_items.level = jnp.array([7, 3])
     state1.agents.position = jnp.array([[5, 0], [4, 1], [5, 2]])
-    env.render(state1)
+    # env.render(state1)
 
     actions = jnp.array([5, 5, 5])
     state2, timestep2 = env.step(state1, actions)
-    env.render(state2)
+    # env.render(state2)
     key, subkey = jax.random.split(key)
-
-# * state1.food_items.position
-# * Array([[2, 5],
-# *       [5, 1]], dtype=int32)
 
 plt.savefig("jumanji/environments/routing/lbf/state.png")
 

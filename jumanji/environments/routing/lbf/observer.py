@@ -417,8 +417,8 @@ class GridObserver(LbfObserver):
         food_grid = jnp.sum(food_grids, axis=0)
 
         # Pad the grid to prevent out-of-bounds observation
-        agent_grid = jnp.pad(agent_grid, self.fov, constant_values=-1)
-        food_grid = jnp.pad(food_grid, self.fov, constant_values=-1)
+        agent_grid = jnp.pad(agent_grid, self.fov, constant_values=0)
+        food_grid = jnp.pad(food_grid, self.fov, constant_values=0)
 
         # Get the indexes to slice the grid and obtain the view around the agent
         slice_len = 2 * self.fov + 1, 2 * self.fov + 1
