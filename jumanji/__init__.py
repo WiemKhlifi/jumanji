@@ -128,8 +128,8 @@ register(id="Snake-v1", entry_point="jumanji.environments:Snake")
 # TSP with 20 randomly generated cities and a dense reward function.
 register(id="TSP-v1", entry_point="jumanji.environments:TSP")
 
-# LevelBasedForaging  with a random generator with 10 grid size,
-# 3 agents and 3 foods and maximum agent's level is 2.
+# LevelBasedForaging  with a random generator with 8 grid size,
+# 2 agents and 2 foods and maximum agent's level is 2.
 register(
     id="LevelBasedForaging-v0", entry_point="jumanji.environments:LevelBasedForaging"
 )

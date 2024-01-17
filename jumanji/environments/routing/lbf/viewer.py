@@ -14,10 +14,9 @@
 
 # flake8: noqa: CCR001
 
-import math
+import os
 from typing import Callable, Optional, Sequence, Tuple
 
-import chex
 import matplotlib.animation as animation
 import matplotlib.image as mpimg
 import matplotlib.pyplot as plt
@@ -36,7 +35,7 @@ from jumanji.viewer import Viewer
 class LevelBasedForagingViewer(Viewer):
     def __init__(
         self,
-        grid_size: Tuple[int, int],
+        grid_size: int,
         name: str = "LevelBasedForaging",
         render_mode: str = "human",
     ) -> None:
@@ -47,7 +46,7 @@ class LevelBasedForagingViewer(Viewer):
             name: custom name for the Viewer. Defaults to `LevelBasedForaging`.
         """
         self._name = name
-        self.rows, self.cols = grid_size
+        self.rows, self.cols = (grid_size, grid_size)
         self.grid_size = 30
 
         self.icon_size = self.grid_size * 5 / self.rows
@@ -211,7 +210,9 @@ class LevelBasedForagingViewer(Viewer):
             cell_center = self._entity_position(agent)
 
             # Read the image file
-            img = mpimg.imread("jumanji/environments/routing/lbf/icons/agent.png")
+            img = mpimg.imread(
+                os.path.join(os.path.dirname(__file__), "icons/agent.png")
+            )
 
             # Create an OffsetImage and add it to the axis
             imagebox = OffsetImage(img, zoom=self.icon_size / self.grid_size)
@@ -233,7 +234,9 @@ class LevelBasedForagingViewer(Viewer):
                 continue
 
             # Read the image file
-            img = mpimg.imread("jumanji/environments/routing/lbf/icons/apple.png")
+            img = mpimg.imread(
+                os.path.join(os.path.dirname(__file__), "icons/apple.png")
+            )
             cell_center = self._entity_position(food)
             self.draw_badge(food.level, cell_center, ax)
 

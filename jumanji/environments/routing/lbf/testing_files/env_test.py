@@ -23,6 +23,20 @@ from jumanji.types import StepType
 
 # TODO: test _get_extra_info
 
+# General integration test
+def test_lbf_environment_integration(lbf_environment, agent0, food0):
+    # Test the interaction of environment, agent, and food
+    initial_state = lbf_environment.reset(seed=42)
+    assert isinstance(initial_state, State)
+
+    # Test the step function
+    action = jnp.array([[1, 0], [0, 1], [0, 0]])  # Example action for two agents
+    next_state, reward, done, info = lbf_environment.step(action)
+    assert isinstance(next_state, State)
+    assert isinstance(reward, jnp.ndarray)
+    assert isinstance(done, bool)
+    assert isinstance(info, dict)
+
 
 def test_get_reward(
     lbf_env_vector_obs: LevelBasedForaging, agents: Agent, food: Food

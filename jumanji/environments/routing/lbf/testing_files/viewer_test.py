@@ -12,71 +12,74 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import chex
 import jax
-import jax.random as random
 import matplotlib
 import matplotlib.pyplot as plt
-import numpy as jnp
-import py
 import pytest
 
-from jumanji.environments.routing.robot_warehouse import RobotWarehouse
-from jumanji.environments.routing.robot_warehouse.viewer import RobotWarehouseViewer
+from jumanji.environments.routing.lbf import LevelBasedForaging
+from jumanji.environments.routing.lbf.viewer import LevelBasedForagingViewer
 
 
-def test_robot_warehouse_viewer__render(
-    robot_warehouse_env: RobotWarehouse, monkeypatch: pytest.MonkeyPatch
+def test_lbf_viewer_render(
+    lbf_environment: LevelBasedForaging,
+    monkeypatch: pytest.MonkeyPatch,
+    key: chex.PRNGKey,
 ) -> None:
-    monkeypatch.setattr(plt, "show", lambda fig: None)
-    key = random.PRNGKey(0)
-    state, _ = robot_warehouse_env.reset(key)
-    grid_size = robot_warehouse_env._generator.grid_size
-    goals = robot_warehouse_env._generator.goals
+    """Test rendering using LevelBasedForagingViewer."""
 
-    viewer = RobotWarehouseViewer(grid_size, goals)
+    monkeypatch.setattr(plt, "show", lambda fig: None)
+    state, _ = lbf_environment.reset(key)
+    grid_size = lbf_environment._generator.grid_size
+
+    viewer = LevelBasedForagingViewer(grid_size)
     viewer.render(state)
     viewer.close()
 
 
-def test_robot_warehouse_viewer__animate(robot_warehouse_env: RobotWarehouse) -> None:
-    key = random.PRNGKey(0)
-    state, _ = jax.jit(robot_warehouse_env.reset)(key)
-    grid_size = robot_warehouse_env._generator.grid_size
-    goals = robot_warehouse_env._generator.goals
+def test_lbf_viewer_animate(
+    lbf_environment: LevelBasedForaging, key: chex.PRNGKey
+) -> None:
+    """Test animation using LevelBasedForagingViewer."""
+
+    state, _ = jax.jit(lbf_environment.reset)(key)
+    grid_size = lbf_environment._generator.grid_size
 
     num_steps = 5
     states = [state]
     for _ in range(num_steps - 1):
-        key, subkey = jax.random.split(key)
-        action = jax.random.choice(subkey, jnp.arange(5), shape=(2,))
-        state, _ = jax.jit(robot_warehouse_env.step)(state, action)
+        key, _ = jax.random.split(key)
+        action = lbf_environment.action_spec().generate_value()
+        state, _ = jax.jit(lbf_environment.step)(state, action)
         states.append(state)
 
-    viewer = RobotWarehouseViewer(grid_size, goals)
+    viewer = LevelBasedForagingViewer(grid_size)
     viewer.animate(states)
     viewer.close()
 
 
-def test_robot_warehouse_viewer__save_animation(
-    robot_warehouse_env: RobotWarehouse, tmpdir: py.path.local
-) -> None:
-    key = random.PRNGKey(0)
-    state, _ = jax.jit(robot_warehouse_env.reset)(key)
-    grid_size = robot_warehouse_env._generator.grid_size
-    goals = robot_warehouse_env._generator.goals
+def test_lbf_viewer_save_animation(
+    lbf_environment: LevelBasedForaging, tmp_path: str, key: chex.PRNGKey
+):
+    """Test saving animation using LevelBasedForagingViewer."""
+
+    state, _ = jax.jit(lbf_environment.reset)(key)
+    grid_size = lbf_environment._generator.grid_size
 
     num_steps = 5
     states = [state]
     for _ in range(num_steps - 1):
-        key, subkey = jax.random.split(key)
-        action = jax.random.choice(subkey, jnp.arange(5), shape=(2,))
-        state, _ = jax.jit(robot_warehouse_env.step)(state, action)
+        key, _ = jax.random.split(key)
+        action = lbf_environment.action_spec().generate_value()
+        state, _ = jax.jit(lbf_environment.step)(state, action)
         states.append(state)
 
-    viewer = RobotWarehouseViewer(grid_size, goals)
+    viewer = LevelBasedForagingViewer(grid_size)
     animation = viewer.animate(states)
     assert isinstance(animation, matplotlib.animation.Animation)
 
-    save_path = str(tmpdir.join("/robot_warehouse_animation_test.gif"))
+    # Use tmp_path directly to create the file path
+    save_path = tmp_path / "lbf_animation_test.gif"
     animation.save(save_path)
     viewer.close()

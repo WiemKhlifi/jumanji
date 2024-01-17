@@ -45,10 +45,10 @@ class Generator(abc.ABC):
             force_coop: Force cooperation between agents.
         """
         # Add assertions to check the validity of the input values.
-        assert 5 <= grid_size < 20, "Grid size must be between 5 and 19."
+        assert 5 <= grid_size, "Grid size must be greater than 5."
         assert 2 <= fov <= grid_size, "Field of view must be between 2 and grid_size."
-        assert 2 <= num_agents < 20, "Number of agents must be between 1 and 19."
-        assert 1 <= num_food < 10, "Number of food items must be between 1 and 10."
+        assert 0 < num_agents, "Number of agents must be positif."
+        assert 0 < num_food, "Number of food items must be positif."
         assert (
             max_agent_level >= 2
         ), "Maximum agent level must be equal or greater to 2."
@@ -204,7 +204,7 @@ class RandomGenerator(Generator):
         return jnp.stack([agent_positions_x, agent_positions_y], axis=1)
 
     def sample_levels(
-        self, max_level: int, shape: chex.Shape, key: chex.PRNGKey
+        self, max_level: int, output_shape: chex.Shape, key: chex.PRNGKey
     ) -> chex.Array:
         """Randomly samples levels within the specified shape.
 
@@ -218,7 +218,7 @@ class RandomGenerator(Generator):
         """
         return jax.random.randint(
             key,
-            shape=shape,
+            shape=output_shape,
             minval=1,
             maxval=max_level + 1,
         )

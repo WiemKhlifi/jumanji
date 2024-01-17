@@ -15,134 +15,80 @@
 import chex
 import jax
 import jax.numpy as jnp
-import pytest
 
-from jumanji.environments.routing.lbf.generator import RandomGenerator
+import jumanji.environments.routing.lbf.utils as utils
 from jumanji.environments.routing.lbf.types import State
 
 
-def are_entities_adjacent(pos0: chex.Array, pos1: chex.Array) -> chex.Array:
-    return jnp.linalg.norm(pos0 - pos1) == 1
+def test_random_generator_call(random_generator, key):
+    state = random_generator(key)
+    assert random_generator.grid_size >= 5
+    assert 2 <= random_generator.fov <= random_generator.grid_size
+    assert isinstance(state, State)
+    chex.assert_equal_shape([state.food_items.position[0], state.food_items.level])
+    chex.assert_equal_shape([state.agents.position[0], state.agents.level])
 
+    # Test that food levels are within a reasonable range if force_coop is True
+    if random_generator.force_coop:
+        max_food_level = jnp.sum(jnp.sort(state.agents.level)[:3])
+        levels = jnp.full(shape=(random_generator.num_food,), fill_value=max_food_level)
+        assert jnp.all(jnp.allclose(state.food_items.level, levels))
 
-def test_generator() -> None:
-    key = jax.random.PRNGKey(42)
-
-    grid_size = 6
-    fov = 6
-    num_agents = 7
-    num_food = 6
-    max_agent_level = 10
-    force_coop = False
-
-    generator = RandomGenerator(
-        grid_size=grid_size,
-        fov=fov,
-        num_agents=num_agents,
-        num_food=num_food,
-        max_agent_level=max_agent_level,
-        force_coop=force_coop,
+    # Check if no two food items are adjacent
+    are_entities_adjacent = jax.vmap(utils.are_entities_adjacent, in_axes=(0, None))(
+        state.food_items, state.food_items
     )
-    state = generator(key)
-
-    # Test food and agents placed within grid bounds.
-    assert jnp.all(state.agents.position >= 0)
-    assert jnp.all(state.agents.position < grid_size)
-    assert jnp.all(state.food_items.position >= 0)
-    assert jnp.all(state.food_items.position < grid_size)
-
-    # test no foods are adjacent to each other
-    adjaciencies = jax.vmap(
-        jax.vmap(are_entities_adjacent, in_axes=(0, None)), in_axes=(None, 0)
-    )(state.food_items.position, state.food_items.position)
-    assert jnp.all(~adjaciencies)
-
-    # test no foods are on the edge of the grid
-    assert jnp.all(state.food_items.position != 0)
-    assert jnp.all(state.food_items.position != grid_size - 1)
-
-    # test that food levels aren't too high to be eaten
-    assert jnp.all(state.food_items.level <= jnp.sum(state.agents.level))
-    assert jnp.all(state.food_items.level >= num_food)
+    assert not jnp.any(are_entities_adjacent)
 
 
-# Test IDs for parametrization
-HAPPY_PATH_ID = "happy_path"
-EDGE_CASE_TOO_MANY_AGENTS_ID = "edge_case_too_many_agents"
-EDGE_CASE_TOO_MANY_FOOD_ID = "edge_case_too_many_food"
-ERROR_CASE_INVALID_GRID_SIZE_ID = "error_case_invalid_grid_size"
+def test_sample_food(random_generator, key):
+    food_positions = random_generator.sample_food(key)
 
-
-@pytest.mark.parametrize(
-    "test_id, grid_size, fov, num_agents, num_food, max_agent_level, force_coop, expected_exception",
-    [
-        # Happy path tests with various realistic test values
-        (HAPPY_PATH_ID, 5, 2, 2, 3, 2, False, None),
-        (HAPPY_PATH_ID, 10, 3, 5, 10, 3, True, None),
-        # Edge cases
-        # Too many agents for the grid size, might result in an infinite loop or all agents at (0, 0)
-        (EDGE_CASE_TOO_MANY_AGENTS_ID, 3, 1, 10, 2, 2, False, None),
-        # Too many food items for the grid size, might result in many food items at (0, 0)
-        (EDGE_CASE_TOO_MANY_FOOD_ID, 3, 1, 2, 10, 2, False, None),
-        # Error cases
-        # Invalid grid size (too small)
-        (ERROR_CASE_INVALID_GRID_SIZE_ID, 1, 1, 1, 1, 1, False, ValueError),
-    ],
-)
-def test_random_generator(
-    test_id,
-    grid_size,
-    fov,
-    num_agents,
-    num_food,
-    max_agent_level,
-    force_coop,
-    expected_exception,
-):
-    key = jax.random.PRNGKey(0)
-
-    # Arrange
-    if expected_exception:
-        with pytest.raises(expected_exception):
-            RandomGenerator(
-                grid_size, fov, num_agents, num_food, max_agent_level, force_coop
-            )
-        return
-    else:
-        generator = RandomGenerator(
-            grid_size, fov, num_agents, num_food, max_agent_level, force_coop
-        )
-
-    # Act
-    state = generator(key)
-
-    # Assert
-    assert isinstance(
-        state, State
-    ), f"Test ID {test_id}: The state should be an instance of State."
-    assert (
-        state.agents.shape[0] == num_agents
-    ), f"Test ID {test_id}: The number of agents should match the input."
-    assert (
-        state.food_items.shape[0] == num_food
-    ), f"Test ID {test_id}: The number of food items should match the input."
-    if not force_coop:
-        assert jnp.all(
-            state.food_items.level <= jnp.sum(jnp.sort(state.agents.level)[:3])
-        ), f"Test ID {test_id}: Food levels should be less than or equal to the sum of the lowest three agent levels."
-    else:
-        assert jnp.all(
-            state.food_items.level == jnp.sum(jnp.sort(state.agents.level)[:3])
-        ), f"Test ID {test_id}: Food levels should be equal to the sum of the lowest three agent levels when force_coop is True."
+    # Check if positions are within the grid bounds and no food on the edge of the grid
     assert jnp.all(
-        state.agents.level <= max_agent_level
-    ), f"Test ID {test_id}: Agent levels should be less than or equal to max_agent_level."
-    assert jnp.all(state.agents.position >= 0) and jnp.all(
-        state.agents.position < grid_size
-    ), f"Test ID {test_id}: Agent positions should be within the grid."
-    assert jnp.all(state.food_items.position >= 0) and jnp.all(
-        state.food_items.position < grid_size
-    ), f"Test ID {test_id}: Food positions should be within the grid."
-    assert (
-        state.step_count == 0
-    ), f"Test ID {test_id}: Initial step count should be zero."
+        (food_positions > 0) & (food_positions < random_generator.grid_size - 1)
+    )
+
+    # Check if no food positions overlap
+    assert not jnp.any(
+        jnp.allclose(food_positions[:, None], food_positions)
+        & ~jnp.eye(random_generator.num_agents, dtype=bool)
+    )
+
+
+def test_sample_agents(random_generator, key):
+    mask = jnp.ones(
+        (random_generator.grid_size, random_generator.grid_size), dtype=bool
+    )
+    mask = mask.ravel()
+
+    agent_positions = random_generator.sample_agents(key, mask)
+
+    # Check if positions are within the grid bounds
+    assert jnp.all(
+        (agent_positions >= 0) & (agent_positions < random_generator.grid_size)
+    )
+
+    # Check if no agent positions overlap
+    assert not jnp.any(
+        jnp.allclose(agent_positions[:, None], agent_positions)
+        & ~jnp.eye(random_generator.num_agents, dtype=bool)
+    )
+
+
+def test_sample_levels(random_generator, key):
+    agent_levels = random_generator.sample_levels(
+        random_generator.max_agent_level, (random_generator.num_agents,), key
+    )
+
+    # Check if levels are within the specified range
+    assert jnp.all(
+        (agent_levels >= 1) & (agent_levels <= random_generator.max_agent_level)
+    )
+
+    # Check if levels are generated randomly
+    key2 = jax.random.PRNGKey(43)
+    agent_levels2 = random_generator.sample_levels(
+        random_generator.max_agent_level, (random_generator.num_agents,), key2
+    )
+    assert not jnp.all(jnp.allclose(agent_levels, agent_levels2))

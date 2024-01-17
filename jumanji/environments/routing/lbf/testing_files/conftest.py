@@ -23,9 +23,12 @@ from jumanji.environments.routing.lbf.types import Agent, Food, State
 from jumanji.tree_utils import tree_transpose
 
 # create food and agents for grid that looks like:
-# AGENT | AGENT | EMPTY
-# AGENT | FOOD  | AGENT
-# FOOD  | EMPTY | EMPTY
+# "AGENT" | EMPTY   | EMPTY   | EMPTY  | EMPTY | EMPTY
+# EMPTY   | "AGENT" | EMPTY   | EMPTY  | EMPTY | EMPTY
+# EMPTY   | "FOOD"  | "AGENT" | "FOOD" | EMPTY | EMPTY
+# EMPTY   | EMPTY   | EMPTY   | EMPTY  | EMPTY | EMPTY
+# EMPTY   | EMPTY   | "FOOD"  | EMPTY  | EMPTY | EMPTY
+# EMPTY   | EMPTY   | EMPTY   | EMPTY  | EMPTY | EMPTY
 
 
 @pytest.fixture
@@ -47,7 +50,7 @@ def agent0() -> Agent:
 def agent1() -> Agent:
     return Agent(
         id=jnp.asarray(1),
-        position=jnp.array([0, 1]),
+        position=jnp.array([1, 1]),
         level=jnp.asarray(2),
         loading=jnp.asarray(False),
     )
@@ -57,18 +60,8 @@ def agent1() -> Agent:
 def agent2() -> Agent:
     return Agent(
         id=jnp.asarray(2),
-        position=jnp.array([1, 0]),
-        level=jnp.asarray(2),
-        loading=jnp.asarray(False),
-    )
-
-
-@pytest.fixture
-def agent3() -> Agent:
-    return Agent(
-        id=jnp.asarray(3),
-        position=jnp.array([1, 2]),
-        level=jnp.asarray(1),
+        position=jnp.array([2, 2]),
+        level=jnp.asarray(3),
         loading=jnp.asarray(False),
     )
 
@@ -77,7 +70,7 @@ def agent3() -> Agent:
 def food0() -> Food:
     return Food(
         id=jnp.asarray(0),
-        position=jnp.array([1, 1]),
+        position=jnp.array([2, 1]),
         level=jnp.asarray(4),
     )
 
@@ -86,19 +79,28 @@ def food0() -> Food:
 def food1() -> Food:
     return Food(
         id=jnp.asarray(1),
-        position=jnp.array([2, 0]),
+        position=jnp.array([2, 3]),
+        level=jnp.asarray(5),
+    )
+
+
+@pytest.fixture
+def food2() -> Food:
+    return Food(
+        id=jnp.asarray(1),
+        position=jnp.array([4, 2]),
         level=jnp.asarray(3),
     )
 
 
 @pytest.fixture
-def agents(agent0: Agent, agent1: Agent, agent2: Agent, agent3: Agent) -> Agent:
-    return tree_transpose([agent0, agent1, agent2, agent3])
+def agents(agent0: Agent, agent1: Agent, agent2: Agent) -> Agent:
+    return tree_transpose([agent0, agent1, agent2])
 
 
 @pytest.fixture
-def food(food0: Food, food1: Food) -> Food:
-    return tree_transpose([food0, food1])
+def food_items(food0: Food, food1: Food, food2: Food) -> Food:
+    return tree_transpose([food0, food1, food2])
 
 
 @pytest.fixture
@@ -108,75 +110,61 @@ def state(agents: Agent, food_items: Food, key: chex.PRNGKey) -> State:
 
 @pytest.fixture
 def agent_grid() -> chex.Array:
-    """Returns the agents' levels in the postion on the grid"""
+    """Returns the agents' levels in their postion on the grid."""
     return jnp.array(
         [
-            [1, 2, 0],
-            [2, 0, 2],
-            [0, 0, 0],
+            [1, 0, 0, 0, 0, 0],
+            [0, 2, 0, 0, 0, 0],
+            [0, 0, 3, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
         ]
     )
 
 
 @pytest.fixture
 def food_grid() -> chex.Array:
-    """Returns the food's levels in the postion on the grid"""
+    """Returns the food items's levels in their postion on the grid."""
     return jnp.array(
         [
-            [0, 0, 0],
-            [0, 4, 0],
-            [3, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 4, 0, 5, 0, 0],
+            [0, 0, 0, 0, 0, 0],
+            [0, 0, 3, 0, 0, 0],
+            [0, 0, 0, 0, 0, 0],
         ]
     )
 
 
 @pytest.fixture
-def lbf_env_vector_obs() -> LevelBasedForaging:
-    generator = RandomGenerator(
+def random_generator():
+    return RandomGenerator(
         grid_size=8,
-        fov=8,
-        num_agents=4,
+        fov=2,
+        num_agents=2,
         num_food=2,
         max_agent_level=2,
-        force_coop=False,
+        force_coop=True,
     )
-    return LevelBasedForaging(generator=generator, time_limit=10)
 
 
 @pytest.fixture
-def lbf_env_grid_obs() -> LevelBasedForaging:
-    generator = RandomGenerator(
-        grid_size=8,
-        fov=8,
-        num_agents=4,
-        num_food=2,
-        max_agent_level=2,
-        force_coop=False,
-    )
-    return LevelBasedForaging(generator=generator, grid_observation=True, time_limit=10)
+def lbf_environment() -> LevelBasedForaging:
+    return LevelBasedForaging()
 
 
 @pytest.fixture
-def lbf_env_default_penalty() -> LevelBasedForaging:
-    generator = RandomGenerator(
-        grid_size=8,
-        fov=8,
-        num_agents=4,
-        num_food=2,
-        max_agent_level=2,
-        force_coop=False,
-    )
-    return LevelBasedForaging(generator=generator, grid_observation=False, penalty=1.0)
+def lbf_env_2s(random_generator) -> LevelBasedForaging:
+    return LevelBasedForaging(generator=random_generator)
 
 
 @pytest.fixture
-def lbf_env_default_no_norm_reward() -> LevelBasedForaging:
-    generator = RandomGenerator(
-        grid_size=8,
-        fov=8,
-        num_agents=4,
-        num_food=2,
-        max_agent_level=2,
-        force_coop=False,
-    )
-    return LevelBasedForaging(generator=generator, normalize_reward=False)
+def lbf_env_with_penalty() -> LevelBasedForaging:
+    return LevelBasedForaging(penalty=1.0)
+
+
+@pytest.fixture
+def lbf_env_no_norm_reward() -> LevelBasedForaging:
+    return LevelBasedForaging(normalize_reward=False)

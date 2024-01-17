@@ -160,7 +160,7 @@ class LevelBasedForaging(Environment[State]):
 
         # create viewer for rendering environment
         self._viewer = viewer or LevelBasedForagingViewer(
-            (self._grid_size, self._grid_size), "LevelBasedForaging"
+            self._grid_size, "LevelBasedForaging"
         )
 
     @property
