@@ -61,7 +61,7 @@ def test_lbf_viewer_animate(
 
 def test_lbf_viewer_save_animation(
     lbf_environment: LevelBasedForaging, tmp_path: str, key: chex.PRNGKey
-):
+) -> None:
     """Test saving animation using LevelBasedForagingViewer."""
 
     state, _ = jax.jit(lbf_environment.reset)(key)
@@ -80,6 +80,6 @@ def test_lbf_viewer_save_animation(
     assert isinstance(animation, matplotlib.animation.Animation)
 
     # Use tmp_path directly to create the file path
-    save_path = tmp_path / "lbf_animation_test.gif"
+    save_path = f"{tmp_path}/lbf_animation_test.gif"
     animation.save(save_path)
     viewer.close()

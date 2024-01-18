@@ -49,12 +49,12 @@ class LevelBasedForaging(Environment[State]):
             See the docs of those classes for more details.
         - action_mask: jax array (bool) of shape (num_agents, 6)
             indicates for each agent which of the size actions
-            (no-op, up, right, down, left, load) is allowed.
+            (no-op, up, down, left, right, load) is allowed.
         - step_count: (int32) the number of step since the beginning of the episode.
 
     - action: jax array (int32) of shape (num_agents,)
             the valid actions for each agent are
-            (0: noop, 1: up, 2: right, 3: down, 4: left, 5: load).
+            (0: noop, 1: up, 2: down, 3: left, 4: right, 5: load).
 
     - reward: jax array (float) of shape (num_agents,)
         When one or more agents load a food, the food level is rewarded to the agents weighted
@@ -114,13 +114,15 @@ class LevelBasedForaging(Environment[State]):
             generator: a `Generator` object that generates the initial state of the environment.
                 Defaults to a `RandomGenerator` with the following parameters:
                     - grid_size: 8
+                    - fov: 8 (full observation of the grid)
                     - num_agents: 2
                     - num_food: 2
                     - max_agent_level: 2
+                    - force_coop: True
             observer: an `Observer` object that generates the observation of the environment.
                 Either a `GridObserver` or a `VectorObserver`.
-            time_limit: the maximum number of steps in an episode. Defaults to 500.
-            viewer: viewer to render the environment. Defaults to `RobotWarehouseViewer`.
+            time_limit: the maximum number of steps in an episode. Defaults to 200.
+            viewer: viewer to render the environment. Defaults to `LevelBasedForagingViewer`.
 
         """
         super().__init__()
@@ -141,7 +143,7 @@ class LevelBasedForaging(Environment[State]):
         self.num_obs_features = utils.calculate_num_observation_features(
             self._num_food, self._num_agents
         )
-        self._observer: Union[VectorObserver, GridObserver] = None
+        self._observer: Union[VectorObserver, GridObserver]
         if not grid_observation:
             self._observer = VectorObserver(
                 fov=self._generator.fov,
@@ -190,11 +192,11 @@ class LevelBasedForaging(Environment[State]):
     def __repr__(self) -> str:
         return (
             "LevelBasedForaging(\n"
-            + f"\tgrid_width={self._grid_size!r},\n"
-            + f"\tgrid_height={self._grid_size!r},\n"
-            + f"\tnum_agents={self._num_agents!r}, \n"
-            + f"\tnum_food={self._num_food!r}, \n"
-            + f"\tmax_agent_level={self._generator.max_agent_level!r}, \n"
+            + f"\t grid_width={self._grid_size},\n"
+            + f"\t grid_height={self._grid_size},\n"
+            + f"\t num_agents={self._num_agents}, \n"
+            + f"\t num_food={self._num_food}, \n"
+            + f"\t max_agent_level={self._generator.max_agent_level}\n"
             ")"
         )
 
@@ -294,7 +296,7 @@ class LevelBasedForaging(Environment[State]):
 
         Args:
             food_items (Food): All the food items in the environment.
-            adj_loading_agents_levels (chex.Array): The level of all agents adjacent to all food items.
+            adj_loading_agents_levels (chex.Array): The level of all agents adjacent to all foods.
             eaten_this_step (chex.Array): Whether the food was eaten or not (this step).
         """
 
@@ -321,14 +323,15 @@ class LevelBasedForaging(Environment[State]):
             ) - penalty
 
             # jnp.nan_to_num: Used in the case where no agents are adjacent to the food
-            normalizer = jnp.sum(adj_loading_agents_levels) * total_food_level
+            normalizer = sum_agents_levels * total_food_level
             reward = jnp.where(
                 self._normalize_reward, jnp.nan_to_num(reward / normalizer), reward
             )
 
             return reward
 
-        # Get reward per food for all food items, then sum it on the agent dimension to get reward per agent.
+        # Get reward per food for all food items,
+        # then sum it on the agent dimension to get reward per agent.
         total_food_level = jnp.sum(food_items.level)
         reward_per_food = jax.vmap(get_reward_per_food, in_axes=(0, 0, 0))(
             food_items, adj_loading_agents_levels, eaten_this_step

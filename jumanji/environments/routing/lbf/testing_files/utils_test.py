@@ -16,107 +16,125 @@ import chex
 import jax
 import jax.numpy as jnp
 
-import jumanji.environments.routing.lbf.constants as constants
 import jumanji.environments.routing.lbf.utils as utils
-from jumanji.environments.routing.lbf.constants import DOWN, LEFT, RIGHT, UP
+from jumanji.environments.routing.lbf.constants import DOWN, LEFT, LOAD, NOOP, RIGHT, UP
 from jumanji.environments.routing.lbf.types import Agent, Food
 
 
-def test_place_agent_on_grid(agent1: Agent, agents: Agent) -> None:
-    grid = jnp.zeros((3, 3),dtype=jnp.int32)
+def test_place_entities_on_grid(
+    agent_grid: chex.Array, food_grid: chex.Array, food_items: Food, agents: Agent
+) -> None:
+    grid = jnp.zeros((6, 6), dtype=jnp.int32)
 
-    expected_agent_1_grid = jnp.array([[0, 0, 0], [0, agent1.level, 0], [0, 0, 0]])
-    assert jnp.all(utils.place_agent_on_grid(agent1, grid) == expected_agent_1_grid)
+    agent_grid_result = jax.vmap(utils.place_agent_on_grid, (0, None))(agents, grid)
+    agent_grid_result = jnp.sum(agent_grid_result, axis=0)
+    assert jnp.all(jnp.allclose(agent_grid_result, agent_grid))
 
-    agent_grids = jax.vmap(utils.place_agent_on_grid, (0, None))(agents, grid)
-    expected_grids = jnp.array(
-        [
-            [[1, 0, 0], [0, 0, 0], [0, 0, 0]],
-            expected_agent_1_grid,
-            [[0, 0, 0], [0, 0, 0], [0, 0, 3]],
-        ]
+    food_grid_result = jax.vmap(utils.place_agent_on_grid, (0, None))(food_items, grid)
+    food_grid_result = jnp.sum(food_grid_result, axis=0)
+    assert jnp.all(jnp.allclose(food_grid_result, food_grid))
+
+
+def test_simulate_agent_movement(
+    agent0: Agent, agent1: Agent, agent2: Agent, agents: Agent, food_items: Food
+) -> None:
+    grid_size = 6
+    agent0_new = utils.simulate_agent_movement(
+        agent0, RIGHT, food_items, agents, grid_size
     )
-    assert jnp.all(agent_grids == expected_grids)
-
-
-def test_place_food_on_grid(food_items: Food) -> None:
-    grid = jnp.zeros((5, 5),dtype=jnp.int32)
-
-    expected_food_grid = jnp.array([[0, 0, 0,0,0], [0, 0,0,0, 0], [0, 4, 0,5,0],[0, 0, 0,0,0],[0, 0, 3,0,0]])
-    food_grid = jnp.sum(
-        jax.vmap(utils.place_food_on_grid, (0, None))(food_items, grid), axis=0
+    assert jnp.all(agent0_new.position == jnp.array([0, 1]))
+    agent1_new = utils.simulate_agent_movement(
+        agent1, LEFT, food_items, agents, grid_size
     )
-    assert jnp.all(food_grid == expected_food_grid)
-
-
-def test_simulate_agent_movement(agent1: Agent,agent0:Agent, agents2: Agent, food_items: Food) -> None:
-    # Agent 1 is at [0, 1] and can move to [0, 0] or [0, 2].
-    # But there is a food at [1, 1] so it cannot move there.
-    grid_size = 5
-    # Move agent 1 to [1, 0]
-    agent1_new = utils.simulate_agent_movement(agent1, LEFT, food_items, agents2, grid_size)
     assert jnp.all(agent1_new.position == jnp.array([1, 0]))
-    
-    # Try move agent 1 into agent 3.
-    agent1_new = utils.simulate_agent_movement(agent1, RIGHT, food_items, agents2, grid_size)
-    assert jnp.all(agent1_new.position == agent1.position)
 
-    # Try move agent 1 into food 0.
-    agent1_new = utils.simulate_agent_movement(agent1, DOWN, food_items, agents2, grid_size)
-    assert jnp.all(agent1_new.position == agent1.position)
-
-    # Try move agent 1 out of bounds.
-    agent0_new = utils.simulate_agent_movement(agent0, UP, food_items, agents2, grid_size)
+    # Move agent out of bounds
+    agent0_new = utils.simulate_agent_movement(
+        agent0, UP, food_items, agents, grid_size
+    )
     assert jnp.all(agent0_new.position == agent0.position)
+
+    # Move agent1 to take the position of the food0
+    agent1_new = utils.simulate_agent_movement(
+        agent1, DOWN, food_items, agents, grid_size
+    )
+    assert jnp.all(agent1_new.position == agent1.position)
+
+    # Try to load and do nothing.
+    agent2_new = utils.simulate_agent_movement(
+        agent2, NOOP, food_items, agents, grid_size
+    )
+    assert jnp.all(agent2_new.position == agent2.position)
+    agent2_new = utils.simulate_agent_movement(
+        agent2, LOAD, food_items, agents, grid_size
+    )
+    assert jnp.all(agent2_new.position == agent2.position)
 
 
 def test_are_entities_adjacent(
-    agents2: Agent, agent0: Agent, agent1: Agent, agent2: Agent, agent3: Agent,food0:Food
+    agents: Agent,
+    agent0: Agent,
+    agent1: Agent,
+    agent2: Agent,
+    food0: Food,
+    food1: Food,
+    food2: Food,
+    food_items: Food,
 ) -> None:
-    assert utils.are_entities_adjacent(agent1, agent3)
+
     assert utils.are_entities_adjacent(agent1, food0)
     assert utils.are_entities_adjacent(agent2, food0)
-    assert utils.are_entities_adjacent(agent2, agent3)
+    assert utils.are_entities_adjacent(agent2, food1)
     assert not utils.are_entities_adjacent(agent0, agent1)
     assert not utils.are_entities_adjacent(agent0, agent2)
-    assert not utils.are_entities_adjacent(agent0, agent3)
+    assert not utils.are_entities_adjacent(agent0, food0)
     assert not utils.are_entities_adjacent(agent1, agent2)
-    assert utils.are_entities_adjacent(agent2, agent3)
-    assert not utils.are_entities_adjacent(agent1, agent2)
+    assert not utils.are_entities_adjacent(agent2, food2)
 
     # check that vmap also works with are_entities_adjacent
-    expected_adj = jnp.array([False, False, False, True])
     assert jnp.all(
-        jax.vmap(utils.are_entities_adjacent, (0, None))(agents2, agent1) == expected_adj
+        jax.vmap(utils.are_entities_adjacent, (0, None))(agents, agent0)
+        == jnp.array([False, False, False])
+    )
+    assert jnp.all(
+        jax.vmap(utils.are_entities_adjacent, (0, None))(agents, food0)
+        == jnp.array([False, True, True])
+    )
+    assert jnp.all(
+        jax.vmap(utils.are_entities_adjacent, (0, None))(food_items, agent2)
+        == jnp.array([True, True, False])
+    )
+
+    assert jnp.all(
+        jax.vmap(utils.are_entities_adjacent, (0, None))(food_items, food0)
+        == jnp.array([False, False, False])
     )
 
 
-def test_eat_food(agents: Agent, food0: Food, food1: Food) -> None:
-    # food 0 can be eaten, food 1 has too high a level for adj agents.
+def test_eat_food(agents: Agent, food0: Food, food1: Food, food2: Food) -> None:
+    # food0 can be eaten by agent1 and agent2, food1 can be eaten by agent2.
     # set all agent actions to loading
     all_loading_agents = jax.vmap(lambda agent: agent.replace(loading=True))(agents)
 
     # check that food 0 can be eaten
     new_food0, eaten_food0, adj_agents = utils.eat_food(all_loading_agents, food0)
-    assert new_food0.eaten
-    assert eaten_food0
-    assert jnp.all(adj_agents == agents.level * jnp.array([0, 1, 1]))
+    assert new_food0.eaten == eaten_food0
+    assert jnp.all(adj_agents == (agents.level * jnp.array([0, 1, 1])))
 
-    # check that food 1 cannot be eaten
+    # check that food 0 can be eaten
     new_food1, eaten_food1, adj_agents = utils.eat_food(all_loading_agents, food1)
-    assert not new_food1.eaten
-    assert not eaten_food1
-    assert jnp.all(adj_agents == agents.level * jnp.array([0, 0, 1]))
+    assert new_food1.eaten == eaten_food1
+    assert jnp.all(adj_agents == (agents.level * jnp.array([0, 0, 1])))
+
+    # check that food 2 cannot be eaten
+    new_food2, eaten_food2, adj_agents = utils.eat_food(all_loading_agents, food2)
+    assert [new_food2.eaten, eaten_food2] == [False, False]
+    assert jnp.all(adj_agents == agents.level * jnp.array([0, 0, 0]))
 
     # check that if food is already eaten, it cannot be eaten again
     new_food0, eaten_food0, adj_agents = utils.eat_food(all_loading_agents, new_food0)
-    assert new_food0.eaten
-    assert not eaten_food0
+    assert new_food0.eaten != eaten_food0
     assert jnp.all(adj_agents == agents.level * jnp.array([0, 0, 0]))
-
-
-def test_flag_duplicates() -> None:
-    pass
 
 
 def test_fix_collisions(agents: Agent) -> None:
@@ -180,9 +198,12 @@ def test_slice_around() -> None:
     view = jax.lax.dynamic_slice(grid, slice_coords, (2 * fov + 1, 2 * fov + 1))
     assert jnp.all(view == expected_slice)
 
-def test_calculate_num_observation_features()->None:
-    num_food= 4
-    num_agents= 6
-    obs_features= jnp.array(30,jnp.int32)
-    calculated_obs_features = utils.calculate_num_observation_features(num_food=num_food,num_agents=num_agents)
-    assert jnp.all(calculated_obs_features==obs_features)
+
+def test_calculate_num_observation_features() -> None:
+    num_food = 4
+    num_agents = 6
+    obs_features = jnp.array(3 * (num_agents + num_food), jnp.int32)
+    calculated_obs_features = utils.calculate_num_observation_features(
+        num_food=num_food, num_agents=num_agents
+    )
+    assert jnp.all(calculated_obs_features == obs_features)

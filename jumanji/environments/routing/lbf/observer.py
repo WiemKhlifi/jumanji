@@ -37,7 +37,8 @@ class LbfObserver(abc.ABC):
 
     The original LBF environment has two different observation types.
     This is a base class to allow for implementing both observation types.
-    Original implementation: https://github.com/semitable/lb-foraging/blob/60939b921e8e9f8ab5affa33c4ad29e916b47d41/lbforaging/foraging/environment.py#L378
+    Original implementation:
+    https://github.com/semitable/lb-foraging/blob/master/lbforaging/foraging/environment.py#L378
     """
 
     def __init__(
@@ -107,7 +108,8 @@ class VectorObserver(LbfObserver):
     An observer for the LBF environment that provides a vector observation.
 
     The vector observation is designed based on the structure used in the paper:
-    "Benchmarking Multi-Agent Deep Reinforcement Learning Algorithms in Cooperative Tasks" - Papoudakis et al.
+    "Benchmarking Multi-Agent Deep Reinforcement Learning Algorithms
+    in Cooperative Tasks" - Papoudakis et al.
 
     The observation is a vector of length 3 * (num_food + num_agents) for each agent.
     - The first 3 * num_food elements represent the positions and levels of food items.
@@ -354,7 +356,7 @@ class VectorObserver(LbfObserver):
         Returns:
             specs.Spec[Observation]: The observation spec for the environment.
         """
-        max_ob = jnp.max(jnp.array([max_food_level, max_agent_level]))
+        max_ob = jnp.max(jnp.array([max_food_level, max_agent_level, self.grid_size]))
         agents_view = specs.BoundedArray(
             shape=(self.num_agents, 3 * (self.num_agents + self.num_food)),
             dtype=jnp.int32,
@@ -399,7 +401,7 @@ class GridObserver(LbfObserver):
         Converts a `State` to a grid-based `Observation`.
 
         Args:
-            state (State): The current state of the environment, containing agent and food information.
+            state (State): The current state of the env, containing agent and food info.
 
         Returns:
             Observation: An Observation containing agents' views, action masks,
@@ -439,6 +441,7 @@ class GridObserver(LbfObserver):
         access_masks = access_masks.at[:, self.fov, self.fov].set(True)
 
         # Compute action mask
+        # TODO: fix the action mask (load action)
         local_pos = jnp.array([self.fov, self.fov])
         next_local_pos = local_pos + MOVES
         action_mask = access_masks[:, next_local_pos.T[0], next_local_pos.T[1]]
@@ -465,7 +468,7 @@ class GridObserver(LbfObserver):
         Returns:
             specs.Spec[Observation]: The observation spec for the environment.
         """
-        max_ob = jnp.max(jnp.array([max_food_level, max_agent_level]))
+        max_ob = jnp.max(jnp.array([max_food_level, max_agent_level, self.grid_size]))
         visible_area = 2 * self.fov + 1
         agents_view = specs.BoundedArray(
             shape=(self.num_agents, 3, visible_area, visible_area),

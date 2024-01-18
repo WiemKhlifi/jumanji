@@ -17,10 +17,13 @@ import jax
 import jax.numpy as jnp
 
 import jumanji.environments.routing.lbf.utils as utils
+from jumanji.environments.routing.lbf.generator import RandomGenerator
 from jumanji.environments.routing.lbf.types import State
 
 
-def test_random_generator_call(random_generator, key):
+def test_random_generator_call(
+    random_generator: RandomGenerator, key: chex.PRNGKey
+) -> None:
     state = random_generator(key)
     assert random_generator.grid_size >= 5
     assert 2 <= random_generator.fov <= random_generator.grid_size
@@ -41,7 +44,7 @@ def test_random_generator_call(random_generator, key):
     assert not jnp.any(are_entities_adjacent)
 
 
-def test_sample_food(random_generator, key):
+def test_sample_food(random_generator: RandomGenerator, key: chex.PRNGKey) -> None:
     food_positions = random_generator.sample_food(key)
 
     # Check if positions are within the grid bounds and no food on the edge of the grid
@@ -56,7 +59,7 @@ def test_sample_food(random_generator, key):
     )
 
 
-def test_sample_agents(random_generator, key):
+def test_sample_agents(random_generator: RandomGenerator, key: chex.PRNGKey) -> None:
     mask = jnp.ones(
         (random_generator.grid_size, random_generator.grid_size), dtype=bool
     )
@@ -76,7 +79,7 @@ def test_sample_agents(random_generator, key):
     )
 
 
-def test_sample_levels(random_generator, key):
+def test_sample_levels(random_generator: RandomGenerator, key: chex.PRNGKeyy) -> None:
     agent_levels = random_generator.sample_levels(
         random_generator.max_agent_level, (random_generator.num_agents,), key
     )

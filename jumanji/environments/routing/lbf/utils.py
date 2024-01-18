@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Tuple
+from typing import Any, Tuple
 
 import chex
 import jax
@@ -53,7 +53,7 @@ def flag_duplicates(a: chex.Array) -> chex.Array:
 
 def update_agent_positions(
     agents: Agent, actions: chex.Array, food_items: Food, grid_size: int
-) -> Agent:
+) -> Any:
     """
     Update agent positions based on actions, resolve collisions, and set loading status.
 
@@ -172,8 +172,8 @@ def eat_food(agents: Agent, food: Food) -> Tuple[Food, chex.Array, chex.Array]:
 
     Returns:
         new_food (Food): Updated state of the food, indicating whether it was eaten.
-        food_eaten_this_step (chex.Array): A flag indicating whether the food was eaten at this step.
-        agents_loading_levels (chex.Array): An array indicating the levels of adjacent agents loading around the food.
+        food_eaten_this_step (chex.Array): Whether or not the food was eaten at this step.
+        agents_loading_levels (chex.Array): Adjacent agents' levels loading around the food.
     """
 
     def get_adjacent_levels(agent: Agent, food: Food) -> chex.Array:
@@ -191,7 +191,7 @@ def eat_food(agents: Agent, food: Food) -> Tuple[Food, chex.Array, chex.Array]:
     food_eaten_this_step = jnp.sum(adj_loading_agents_levels) >= food.level
 
     # Set food to eaten if it was eaten.
-    new_food = food.replace(eaten=food_eaten_this_step | food.eaten)
+    new_food = food.replace(eaten=food_eaten_this_step | food.eaten)  # type: ignore
 
     return new_food, food_eaten_this_step, adj_loading_agents_levels
 
