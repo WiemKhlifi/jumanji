@@ -632,6 +632,10 @@
         
           
         
+          
+        
+          
+        
       
       
         <label class="md-nav__link" for="__nav_2_3">
@@ -766,6 +770,34 @@
     <li class="md-nav__item">
       <a href="../../../environments/tsp/" class="md-nav__link">
         TSP
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../environments/sokoban/" class="md-nav__link">
+        Sokoban
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../environments/pac_man/" class="md-nav__link">
+        PacMan
       </a>
     </li>
   
@@ -1225,6 +1257,10 @@
         
           
         
+          
+        
+          
+        
       
       
         <label class="md-nav__link" for="__nav_4_1_4">
@@ -1306,27 +1342,6 @@
           <li class="md-nav__item">
   <a href="#jumanji.environments.routing.connector.env.Connector.step" class="md-nav__link">
     step()
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#jumanji.environments.routing.connector.env.Connector.render" class="md-nav__link">
-    render()
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#jumanji.environments.routing.connector.env.Connector.observation_spec" class="md-nav__link">
-    observation_spec()
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#jumanji.environments.routing.connector.env.Connector.action_spec" class="md-nav__link">
-    action_spec()
   </a>
   
 </li>
@@ -1443,6 +1458,34 @@
 
             
           
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../sokoban/" class="md-nav__link">
+        Sokoban
+      </a>
+    </li>
+  
+
+            
+          
+            
+              
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pac_man/" class="md-nav__link">
+        PacMan
+      </a>
+    </li>
+  
+
+            
+          
         </ul>
       </nav>
     </li>
@@ -1517,7 +1560,7 @@
 
 <h2 id="jumanji.environments.routing.connector.env.Connector" class="doc doc-heading">
         <code>
-Connector            (<a class="autorefs autorefs-internal" title="jumanji.env.Environment" href="../../env/#jumanji.env.Environment">Environment</a>)
+Connector            (<span title="jumanji.environments.routing.connector.env.MaConnector">MaConnector</span>)
         </code>
 
 
@@ -1526,75 +1569,6 @@ Connector            (<a class="autorefs autorefs-internal" title="jumanji.env.E
 
     <div class="doc doc-contents first">
 
-      <p>The <code>Connector</code> environment is a gridworld problem where multiple pairs of points (sets)
-must be connected without overlapping the paths taken by any other set. This is achieved
-by allowing certain points to move to an adjacent cell at each step. However, each time a
-point moves it leaves an impassable trail behind it. The goal is to connect all sets.</p>
-<ul>
-<li>
-<p>observation - <code>Observation</code></p>
-<ul>
-<li>action mask: jax array (bool) of shape (num_agents, 5).</li>
-<li>step_count: jax array (int32) of shape ()
-    the current episode step.</li>
-<li>grid: jax array (int32) of shape (grid_size, grid_size)<ul>
-<li>with 2 agents you might have a grid like this:
-  4 0 1
-  5 0 1
-  6 3 2
-  which means agent 1 has moved from the top right of the grid down and is currently in
-  the bottom right corner and is aiming to get to the middle bottom cell. Agent 2
-  started in the top left and moved down once towards its target in the bottom left.</li>
-</ul>
-</li>
-</ul>
-</li>
-<li>
-<p>action: jax array (int32) of shape (num_agents,):</p>
-<ul>
-<li>can take the values [0,1,2,3,4] which correspond to [No Op, Up, Right, Down, Left].</li>
-<li>each value in the array corresponds to an agent's action.</li>
-</ul>
-</li>
-<li>
-<p>reward: jax array (float) of shape ():</p>
-<ul>
-<li>dense: reward is 1 for each successful connection on that step. Additionally,
-    each pair of points that have not connected receives a penalty reward of -0.03.</li>
-</ul>
-</li>
-<li>
-<p>episode termination:</p>
-<ul>
-<li>all agents either can't move (no available actions) or have connected to their target.</li>
-<li>the time limit is reached.</li>
-</ul>
-</li>
-<li>
-<p>state: State:</p>
-<ul>
-<li>key: jax PRNG key used to randomly spawn agents and targets.</li>
-<li>grid: jax array (int32) of shape (grid_size, grid_size) giving the observation.</li>
-<li>step_count: jax array (int32) of shape () number of steps elapsed in the current episode.</li>
-</ul>
-</li>
-</ul>
-<div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1</span>
-<span class="normal">2</span>
-<span class="normal">3</span>
-<span class="normal">4</span>
-<span class="normal">5</span>
-<span class="normal">6</span>
-<span class="normal">7</span>
-<span class="normal">8</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="kn">from</span> <span class="nn">jumanji.environments</span> <span class="kn">import</span> <span class="n">Connector</span>
-<span class="n">env</span> <span class="o">=</span> <span class="n">Connector</span><span class="p">()</span>
-<span class="n">key</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">key</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-<span class="n">state</span><span class="p">,</span> <span class="n">timestep</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">reset</span><span class="p">)(</span><span class="n">key</span><span class="p">)</span>
-<span class="n">env</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
-<span class="n">action</span> <span class="o">=</span> <span class="n">env</span><span class="o">.</span><span class="n">action_spec</span><span class="p">()</span><span class="o">.</span><span class="n">generate_value</span><span class="p">()</span>
-<span class="n">state</span><span class="p">,</span> <span class="n">timestep</span> <span class="o">=</span> <span class="n">jax</span><span class="o">.</span><span class="n">jit</span><span class="p">(</span><span class="n">env</span><span class="o">.</span><span class="n">step</span><span class="p">)(</span><span class="n">state</span><span class="p">,</span> <span class="n">action</span><span class="p">)</span>
-<span class="n">env</span><span class="o">.</span><span class="n">render</span><span class="p">(</span><span class="n">state</span><span class="p">)</span>
-</code></pre></div></td></tr></table></div>
 
 
 
@@ -1730,121 +1704,6 @@ timestep: <code>TimeStep</code> object corresponding the timestep returned by th
 
 
 
-  <div class="doc doc-object doc-method">
-
-
-
-<h3 id="jumanji.environments.routing.connector.env.Connector.render" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">render</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">State</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">numpy</span><span class="o">.</span><span class="n">ndarray</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">numpy</span><span class="o">.</span><span class="n">dtype</span><span class="p">[</span><span class="o">+</span><span class="n">ScalarType</span><span class="p">]]]</span></code>
-
-
-<a href="#jumanji.environments.routing.connector.env.Connector.render" class="headerlink" title="Permanent link">#</a></h3>
-
-    <div class="doc doc-contents ">
-
-      <p>Render the given state of the environment.</p>
-
-<p><strong>Parameters:</strong></p>
-<table>
-  <thead>
-    <tr>
-      <th>Name</th>
-      <th>Type</th>
-      <th>Description</th>
-      <th>Default</th>
-    </tr>
-  </thead>
-  <tbody>
-      <tr>
-        <td><code>state</code></td>
-        <td><code>State</code></td>
-        <td><p><code>State</code> object containing the current environment state.</p></td>
-        <td><em>required</em></td>
-      </tr>
-  </tbody>
-</table>
-    </div>
-
-  </div>
-
-
-
-  <div class="doc doc-object doc-method">
-
-
-
-<h3 id="jumanji.environments.routing.connector.env.Connector.observation_spec" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">observation_spec</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">jumanji</span><span class="o">.</span><span class="n">specs</span><span class="o">.</span><span class="n">Spec</span><span class="p">[</span><span class="n">jumanji</span><span class="o">.</span><span class="n">environments</span><span class="o">.</span><span class="n">routing</span><span class="o">.</span><span class="n">connector</span><span class="o">.</span><span class="n">types</span><span class="o">.</span><span class="n">Observation</span><span class="p">]</span></code>
-
-
-<a href="#jumanji.environments.routing.connector.env.Connector.observation_spec" class="headerlink" title="Permanent link">#</a></h3>
-
-    <div class="doc doc-contents ">
-
-      <p>Specifications of the observation of the <code>Connector</code> environment.</p>
-
-<p><strong>Returns:</strong></p>
-<table>
-  <thead>
-    <tr>
-      <th>Type</th>
-      <th>Description</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>Spec for the `Observation` whose fields are</code></td>
-      <td><ul>
-<li>grid: BoundedArray (int32) of shape (grid_size, grid_size).</li>
-<li>action_mask: BoundedArray (bool) of shape (num_agents, 5).</li>
-<li>step_count: BoundedArray (int32) of shape ().</li>
-</ul></td>
-    </tr>
-  </tbody>
-</table>
-    </div>
-
-  </div>
-
-
-
-  <div class="doc doc-object doc-method">
-
-
-
-<h3 id="jumanji.environments.routing.connector.env.Connector.action_spec" class="doc doc-heading">
-<code class="highlight language-python"><span class="n">action_spec</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">MultiDiscreteArray</span></code>
-
-
-<a href="#jumanji.environments.routing.connector.env.Connector.action_spec" class="headerlink" title="Permanent link">#</a></h3>
-
-    <div class="doc doc-contents ">
-
-      <p>Returns the action spec for the Connector environment.</p>
-<p>5 actions: [0,1,2,3,4] -&gt; [No Op, Up, Right, Down, Left]. Since this is an environment with
-a multi-dimensional action space, it expects an array of actions of shape (num_agents,).</p>
-
-<p><strong>Returns:</strong></p>
-<table>
-  <thead>
-    <tr>
-      <th>Type</th>
-      <th>Description</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td><code>observation_spec</code></td>
-      <td><p><code>MultiDiscreteArray</code> of shape (num_agents,).</p></td>
-    </tr>
-  </tbody>
-</table>
-    </div>
-
-  </div>
-
-
-
 
 
   </div>
@@ -1858,7 +1717,7 @@ a multi-dimensional action space, it expects an array of actions of shape (num_a
   <small>
     
       Last update:
-      2024-01-16
+      2024-03-01
     
   </small>
 </div>
